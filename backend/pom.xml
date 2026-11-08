@@ -11,6 +11,7 @@
     <description>SmartTrip Backend Services Aggregator</description>
 
     <modules>
+        <module>common-messaging</module>
         <module>discovery-service</module>
         <module>api-gateway</module>
         <module>user-service</module>

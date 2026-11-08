@@ -1,7 +1,12 @@
 package com.smarttrip.tour.entity;
 
+import com.smarttrip.tour.enums.DepartureStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -28,19 +33,25 @@ public class TourDeparture {
     @Column(name = "return_date", nullable = false)
     private LocalDate returnDate;
 
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal price;
+
     @Column(name = "total_seats", nullable = false)
     private Integer totalSeats;
 
     @Column(name = "available_seats", nullable = false)
     private Integer availableSeats;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private String status = "AVAILABLE";
+    private DepartureStatus status = DepartureStatus.SCHEDULED;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @UpdateTimestamp
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

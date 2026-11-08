@@ -5,9 +5,9 @@ spring:
   application:
     name: tour-service
   datasource:
-    url: ${TOUR_DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/smarttrip_tour_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
-    username: ${DB_USER:smarttrip}
-    password: ${DB_PASSWORD:smarttrip_pwd}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/smarttrip_tour_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:smarttrip_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:smarttrip_secret}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -16,6 +16,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -35,4 +36,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

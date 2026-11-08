@@ -3,6 +3,7 @@ package com.smarttrip.payment.listener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttrip.messaging.command.AuthorizePaymentCommand;
 import com.smarttrip.messaging.command.CapturePaymentCommand;
+import com.smarttrip.messaging.command.RefundPaymentCommand;
 import com.smarttrip.messaging.command.VoidPaymentCommand;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
@@ -17,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 @Slf4j
 @Component
@@ -55,6 +58,10 @@ public class PaymentCommandHandler {
             case "VOID_PAYMENT_COMMAND" -> {
                 VoidPaymentCommand cmd = messagingObjectMapper.convertValue(envelope.getPayload(), VoidPaymentCommand.class);
                 handleVoid(cmd);
+            }
+            case "REFUND_PAYMENT_COMMAND" -> {
+                RefundPaymentCommand cmd = messagingObjectMapper.convertValue(envelope.getPayload(), RefundPaymentCommand.class);
+                handleRefund(cmd);
             }
             default -> log.debug("Payment Service ignored command: {}", envelope.getMessageType());
         }
@@ -122,6 +129,19 @@ public class PaymentCommandHandler {
             log.info("Payment voided for booking {}", cmd.getBookingCode());
         } catch (Exception e) {
             log.error("Failed to void payment for booking {}: {}", cmd.getBookingCode(), e.getMessage());
+        }
+    }
+
+    private void handleRefund(RefundPaymentCommand cmd) {
+        try {
+            if (cmd.getAmount() != null && cmd.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+                paymentService.refund(cmd.getUserId(), cmd.getBookingCode(), cmd.getAmount(), cmd.getReason());
+                log.info("Payment refunded for booking {}: amount={}", cmd.getBookingCode(), cmd.getAmount());
+            } else {
+                log.info("Refund amount is 0 for booking {}, skipping wallet balance credit", cmd.getBookingCode());
+            }
+        } catch (Exception e) {
+            log.error("Failed to refund payment for booking {}: {}", cmd.getBookingCode(), e.getMessage());
         }
     }
 }

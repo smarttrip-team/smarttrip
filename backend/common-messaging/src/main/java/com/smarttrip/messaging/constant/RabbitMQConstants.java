@@ -38,6 +38,7 @@ public final class RabbitMQConstants {
     public static final String ROUTING_KEY_RESERVE_HOTEL = "command.hotel.reserve";
     public static final String ROUTING_KEY_CONFIRM_HOTEL = "command.hotel.confirm";
     public static final String ROUTING_KEY_RELEASE_HOTEL = "command.hotel.release";
+    public static final String ROUTING_KEY_CANCEL_HOTEL = "command.hotel.cancel";
     public static final String ROUTING_KEY_HOTEL_COMMAND_PATTERN = "command.hotel.*";
 
     public static final String ROUTING_KEY_HOTEL_RESERVED = "event.hotel.reserved";
@@ -48,6 +49,7 @@ public final class RabbitMQConstants {
     public static final String ROUTING_KEY_AUTHORIZE_PAYMENT = "command.payment.authorize";
     public static final String ROUTING_KEY_CAPTURE_PAYMENT = "command.payment.capture";
     public static final String ROUTING_KEY_VOID_PAYMENT = "command.payment.void";
+    public static final String ROUTING_KEY_REFUND_PAYMENT = "command.payment.refund";
     public static final String ROUTING_KEY_PAYMENT_COMMAND_PATTERN = "command.payment.*";
 
     public static final String ROUTING_KEY_PAYMENT_AUTHORIZED = "event.payment.authorized";

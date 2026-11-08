@@ -24,6 +24,8 @@ public interface BookingSagaOrchestrator {
 
     void handlePaymentAuthorizeFailed(MessageEnvelope<PaymentAuthorizeFailedEvent> envelope);
 
+    SagaInstance cancelBooking(Booking booking);
+
     SagaInstance getSagaByBookingId(Long bookingId);
 
     List<SagaStep> getSagaSteps(String sagaId);

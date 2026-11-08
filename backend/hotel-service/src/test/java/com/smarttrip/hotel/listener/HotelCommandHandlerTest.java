@@ -199,4 +199,46 @@ class HotelCommandHandlerTest {
         assertThat(inv.getAvailableRooms()).isEqualTo(5);
         verify(roomInventoryRepository, times(1)).save(inv);
     }
+
+    @Test
+    @DisplayName("Cancellation: Should process CANCEL_HOTEL_RESERVATION_COMMAND and restore room inventory")
+    void handleCancelHotelReservation_success() {
+        when(idempotentConsumerService.markProcessedIfNew("msg-cancel-hotel", "HotelCommandHandler")).thenReturn(true);
+
+        RoomType roomType = RoomType.builder().id(20L).basePrice(new BigDecimal("1000000.00")).build();
+        RoomInventory inv = RoomInventory.builder()
+                .id(101L)
+                .roomType(roomType)
+                .availableRooms(2)
+                .inventoryDate(LocalDate.now().plusDays(5))
+                .build();
+
+        LocalDate checkIn = LocalDate.now().plusDays(5);
+        LocalDate checkOut = LocalDate.now().plusDays(7);
+
+        when(roomInventoryRepository.findByRoomTypeIdAndInventoryDateBetween(20L, checkIn, checkOut.minusDays(1)))
+                .thenReturn(List.of(inv));
+
+        ReleaseHotelCommand cmd = ReleaseHotelCommand.builder()
+                .bookingId(1L)
+                .bookingCode("BK-HOTEL-CANCEL")
+                .hotelId(10L)
+                .roomTypeId(20L)
+                .checkInDate(checkIn)
+                .checkOutDate(checkOut)
+                .roomQuantity(3)
+                .build();
+
+        MessageEnvelope<Object> envelope = MessageEnvelope.<Object>builder()
+                .messageId("msg-cancel-hotel")
+                .messageType("CANCEL_HOTEL_RESERVATION_COMMAND")
+                .payload(cmd)
+                .build();
+
+        hotelCommandHandler.onHotelCommand(envelope);
+
+        // Room count restored from 2 to 5 (2 + 3 = 5)
+        assertThat(inv.getAvailableRooms()).isEqualTo(5);
+        verify(roomInventoryRepository, times(1)).save(inv);
+    }
 }

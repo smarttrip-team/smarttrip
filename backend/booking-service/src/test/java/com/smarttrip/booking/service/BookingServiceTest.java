@@ -306,4 +306,58 @@ class BookingServiceTest {
         assertThat(list.get(0).getBookingCode()).isEqualTo("BK-2");
         assertThat(list.get(1).getBookingCode()).isEqualTo("BK-1");
     }
+    @Test
+    @DisplayName("Should cancel CONFIRMED booking and invoke Cancellation Saga")
+    void cancelBooking_confirmed_success() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .bookingCode("BK-CANCEL-1")
+                .customerId(10L)
+                .status("CONFIRMED")
+                .totalAmount(new BigDecimal("5000000.00"))
+                .build();
+
+        when(bookingRepository.findByBookingCode("BK-CANCEL-1")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BookingResponse response = bookingService.cancelBooking("BK-CANCEL-1", 10L);
+
+        assertThat(response.getStatus()).isEqualTo("CANCELLED");
+        verify(sagaOrchestrator, times(1)).cancelBooking(booking);
+        verify(bookingRepository, times(1)).save(booking);
+    }
+
+    @Test
+    @DisplayName("Should reject cancellation if user is not the booking owner")
+    void cancelBooking_unauthorizedUser_throwsException() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .bookingCode("BK-CANCEL-1")
+                .customerId(10L)
+                .status("CONFIRMED")
+                .build();
+
+        when(bookingRepository.findByBookingCode("BK-CANCEL-1")).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking("BK-CANCEL-1", 999L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not authorized");
+    }
+
+    @Test
+    @DisplayName("Should reject cancellation if booking is not in CONFIRMED status")
+    void cancelBooking_notConfirmed_throwsException() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .bookingCode("BK-CANCEL-1")
+                .customerId(10L)
+                .status("PENDING")
+                .build();
+
+        when(bookingRepository.findByBookingCode("BK-CANCEL-1")).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking("BK-CANCEL-1", 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Only CONFIRMED bookings can be cancelled");
+    }
 }

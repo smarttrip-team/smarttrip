@@ -1,12 +1,18 @@
 package com.smarttrip.booking.service.impl;
 
+import com.smarttrip.booking.client.TourFeignClient;
+import com.smarttrip.booking.client.UserFeignClient;
+import com.smarttrip.booking.client.dto.DepartureSnapshotDto;
+import com.smarttrip.booking.client.dto.UserStatusDto;
 import com.smarttrip.booking.dto.*;
 import com.smarttrip.booking.entity.*;
 import com.smarttrip.booking.exception.BusinessException;
 import com.smarttrip.booking.exception.ResourceNotFoundException;
+import com.smarttrip.booking.exception.UserBlockedException;
 import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
 import com.smarttrip.booking.service.BookingService;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +33,8 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final SagaInstanceRepository sagaInstanceRepository;
+    private final UserFeignClient userFeignClient;
+    private final TourFeignClient tourFeignClient;
 
     @Override
     @Transactional
@@ -40,6 +48,12 @@ public class BookingServiceImpl implements BookingService {
         if (request.getUnitPrice() == null || request.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("Tour unit price must be greater than zero");
         }
+
+        // OpenFeign Scenario 1: Verify Customer status
+        validateCustomerStatus(request.getCustomerId());
+
+        // OpenFeign Scenario 2: Verify Departure and Snapshot pricing
+        validateAndSnapshotTour(request);
 
         // Idempotency check
         if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
@@ -156,6 +170,54 @@ public class BookingServiceImpl implements BookingService {
         return bookingRepository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    private void validateCustomerStatus(Long customerId) {
+        if (userFeignClient == null || customerId == null) {
+            return;
+        }
+        try {
+            UserStatusDto status = userFeignClient.getUserStatus(customerId);
+            if (status != null && (!status.isActive() || "BLOCKED".equalsIgnoreCase(status.getStatus()))) {
+                throw new UserBlockedException("User account is BLOCKED. Booking rejected.");
+            }
+        } catch (UserBlockedException ex) {
+            throw ex;
+        } catch (FeignException.NotFound ex) {
+            throw new ResourceNotFoundException("Customer not found with id: " + customerId);
+        } catch (Exception ex) {
+            log.warn("User Feign client call failed or skipped in standalone mode: {}", ex.getMessage());
+        }
+    }
+
+    private void validateAndSnapshotTour(BookingCreateRequest request) {
+        if (tourFeignClient == null || request.getDepartureId() == null) {
+            return;
+        }
+        try {
+            DepartureSnapshotDto snapshot = tourFeignClient.getDepartureSnapshot(request.getDepartureId());
+            if (snapshot != null) {
+                if (!snapshot.isActive()) {
+                    throw new BusinessException("Tour departure is not active for booking");
+                }
+                if (snapshot.getAvailableSeats() != null && snapshot.getAvailableSeats() < request.getQuantity()) {
+                    throw new BusinessException("Not enough available seats. Required: " 
+                            + request.getQuantity() + ", Available: " + snapshot.getAvailableSeats());
+                }
+                if (snapshot.getPrice() != null && request.getUnitPrice() == null) {
+                    request.setUnitPrice(snapshot.getPrice());
+                }
+                if (snapshot.getTourTitle() != null && (request.getTourName() == null || request.getTourName().isBlank())) {
+                    request.setTourName(snapshot.getTourTitle());
+                }
+            }
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (FeignException.NotFound ex) {
+            throw new ResourceNotFoundException("Tour departure not found with id: " + request.getDepartureId());
+        } catch (Exception ex) {
+            log.warn("Tour Feign client call failed or skipped in standalone mode: {}", ex.getMessage());
+        }
     }
 
     private BookingResponse mapToResponse(Booking booking) {

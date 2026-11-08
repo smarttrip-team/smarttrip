@@ -1,5 +1,6 @@
 package com.smarttrip.hotel.service.impl;
 
+import com.smarttrip.hotel.client.UserFeignClient;
 import com.smarttrip.hotel.dto.*;
 import com.smarttrip.hotel.entity.Hotel;
 import com.smarttrip.hotel.entity.RoomInventory;
@@ -29,6 +30,7 @@ public class HotelServiceImpl implements HotelService {
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
     private final RoomInventoryRepository roomInventoryRepository;
+    private final UserFeignClient userFeignClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -127,6 +129,13 @@ public class HotelServiceImpl implements HotelService {
     @Override
     @Transactional
     public HotelResponse createHotel(HotelCreateRequest request) {
+        if (request.getManagerId() != null) {
+            Map<String, Object> verifyResult = userFeignClient.verifyRole(request.getManagerId(), "ROLE_HOTEL_MANAGER");
+            if (verifyResult == null || !Boolean.TRUE.equals(verifyResult.get("verified"))) {
+                throw new BusinessException("User with id " + request.getManagerId() + " does not have ROLE_HOTEL_MANAGER role");
+            }
+        }
+
         Hotel hotel = Hotel.builder()
                 .name(request.getName().trim())
                 .address(request.getAddress().trim())

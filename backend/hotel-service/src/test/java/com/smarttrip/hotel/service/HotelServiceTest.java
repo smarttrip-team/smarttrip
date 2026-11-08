@@ -1,5 +1,6 @@
 package com.smarttrip.hotel.service;
 
+import com.smarttrip.hotel.client.UserFeignClient;
 import com.smarttrip.hotel.dto.HotelAvailabilityResponse;
 import com.smarttrip.hotel.dto.HotelCreateRequest;
 import com.smarttrip.hotel.dto.HotelResponse;
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,6 +43,9 @@ class HotelServiceTest {
 
     @Mock
     private RoomInventoryRepository roomInventoryRepository;
+
+    @Mock
+    private UserFeignClient userFeignClient;
 
     @InjectMocks
     private HotelServiceImpl hotelService;
@@ -100,6 +105,9 @@ class HotelServiceTest {
                 .managerId(10L)
                 .build();
 
+        when(userFeignClient.verifyRole(10L, "ROLE_HOTEL_MANAGER"))
+                .thenReturn(Map.of("verified", true));
+
         when(hotelRepository.save(any(Hotel.class))).thenAnswer(invocation -> {
             Hotel h = invocation.getArgument(0);
             h.setId(2L);
@@ -111,6 +119,23 @@ class HotelServiceTest {
         assertNotNull(response);
         assertEquals(2L, response.getId());
         assertEquals("New Hotel", response.getName());
+        verify(userFeignClient).verifyRole(10L, "ROLE_HOTEL_MANAGER");
+    }
+
+    @Test
+    void testCreateHotel_ManagerRoleNotVerified_ThrowsBusinessException() {
+        HotelCreateRequest request = HotelCreateRequest.builder()
+                .name("New Hotel")
+                .address("456 Tran Phu, Da Nang")
+                .description("City center")
+                .managerId(10L)
+                .build();
+
+        when(userFeignClient.verifyRole(10L, "ROLE_HOTEL_MANAGER"))
+                .thenReturn(Map.of("verified", false));
+
+        assertThrows(BusinessException.class, () -> hotelService.createHotel(request));
+        verify(hotelRepository, never()).save(any());
     }
 
     @Test

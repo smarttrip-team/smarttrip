@@ -25,6 +25,10 @@ public class Wallet {
     @Builder.Default
     private BigDecimal balance = BigDecimal.ZERO;
 
+    @Column(name = "held_amount", nullable = false, precision = 15, scale = 2)
+    @Builder.Default
+    private BigDecimal heldAmount = BigDecimal.ZERO;
+
     @Column(nullable = false, length = 10)
     @Builder.Default
     private String currency = "VND";
@@ -43,4 +47,10 @@ public class Wallet {
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+
+    public BigDecimal getAvailableBalance() {
+        BigDecimal b = balance != null ? balance : BigDecimal.ZERO;
+        BigDecimal h = heldAmount != null ? heldAmount : BigDecimal.ZERO;
+        return b.subtract(h);
+    }
 }

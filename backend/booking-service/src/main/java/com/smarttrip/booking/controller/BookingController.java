@@ -57,4 +57,12 @@ public class BookingController {
     public ResponseEntity<List<BookingResponse>> getBookingsByCustomerId(@PathVariable Long customerId) {
         return ResponseEntity.ok(bookingService.getBookingsByCustomerId(customerId));
     }
+
+    @PostMapping({"/api/v1/bookings/{bookingCode}/cancel", "/api/bookings/{bookingCode}/cancel"})
+    public ResponseEntity<BookingResponse> cancelBooking(
+            @PathVariable String bookingCode,
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId) {
+        BookingResponse response = bookingService.cancelBooking(bookingCode, headerUserId);
+        return ResponseEntity.ok(response);
+    }
 }

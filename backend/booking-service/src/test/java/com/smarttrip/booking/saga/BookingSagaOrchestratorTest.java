@@ -6,6 +6,7 @@ import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
 import com.smarttrip.booking.repository.SagaStepRepository;
 import com.smarttrip.booking.saga.impl.BookingSagaOrchestratorImpl;
+import com.smarttrip.messaging.command.RefundPaymentCommand;
 import com.smarttrip.messaging.command.ReleaseHotelCommand;
 import com.smarttrip.messaging.command.ReleaseTourCommand;
 import com.smarttrip.messaging.command.ReserveTourCommand;
@@ -94,6 +95,8 @@ class BookingSagaOrchestratorTest {
             stepsMap.put(s.getSagaInstance().getSagaId() + ":" + s.getStepName(), s);
             return s;
         });
+
+        lenient().when(sagaInstanceRepository.save(any(SagaInstance.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -302,7 +305,7 @@ class BookingSagaOrchestratorTest {
     @Test
     @DisplayName("Failure Scenario A: Tour no seats -> Fails booking, marks saga COMPENSATED, no compensation commands")
     void handleTourReserveFailed_cancelsBooking_andMarksSagaCompensated() {
-        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(1L)).thenReturn(Optional.of(mockSaga));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
 
         stepsMap.put("saga-uuid-1:RESERVE_TOUR", SagaStep.builder()
@@ -344,7 +347,7 @@ class BookingSagaOrchestratorTest {
     @Test
     @DisplayName("Failure Scenario B: Hotel no rooms -> Compensates tour seats, fails booking, marks saga COMPENSATED")
     void handleHotelReserveFailed_compensatesTour_andMarksSagaCompensated() {
-        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(1L)).thenReturn(Optional.of(mockSaga));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
 
         stepsMap.put("saga-uuid-1:RESERVE_HOTEL", SagaStep.builder()
@@ -401,7 +404,7 @@ class BookingSagaOrchestratorTest {
     @Test
     @DisplayName("Failure Scenario C1 (No Hotel): Payment auth failed -> Compensates tour seats, fails booking, marks saga COMPENSATED")
     void handlePaymentAuthorizeFailed_withoutHotel_compensatesTour() {
-        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(1L)).thenReturn(Optional.of(mockSaga));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
 
         stepsMap.put("saga-uuid-1:AUTHORIZE_PAYMENT", SagaStep.builder()
@@ -460,7 +463,7 @@ class BookingSagaOrchestratorTest {
                 .priceSnapshot(new BigDecimal("1000000.00"))
                 .build());
 
-        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(1L)).thenReturn(Optional.of(mockSaga));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
 
         stepsMap.put("saga-uuid-1:AUTHORIZE_PAYMENT", SagaStep.builder()
@@ -518,5 +521,155 @@ class BookingSagaOrchestratorTest {
 
         verify(bookingRepository, times(1)).save(mockBooking);
         verify(sagaInstanceRepository, times(1)).save(mockSaga);
+    }
+
+    // ==========================================
+    // Cancellation Saga & Refund Policy (Issue #16)
+    // ==========================================
+
+    @Test
+    @DisplayName("Cancellation: Departure > 7 days -> 100% refund, release tour seats, saga COMPLETED")
+    void cancelBooking_moreThanSevenDays_refunds100Percent() {
+        // Departure date: today + 10 days (> 7 days)
+        mockBooking.getItems().get(0).setDepartureDateSnapshot(LocalDate.now().plusDays(10));
+        mockBooking.setStatus("CONFIRMED");
+
+        SagaInstance cancelSaga = sagaOrchestrator.cancelBooking(mockBooking);
+
+        assertThat(cancelSaga.getSagaType()).isEqualTo("BOOKING_CANCEL");
+        assertThat(cancelSaga.getStatus()).isEqualTo("COMPLETED");
+
+        // Verify steps
+        assertThat(stepsMap.get(cancelSaga.getSagaId() + ":CHECK_CANCELLATION_POLICY").getStatus()).isEqualTo("COMPLETED");
+        assertThat(stepsMap.get(cancelSaga.getSagaId() + ":REFUND_PAYMENT").getStatus()).isEqualTo("COMPLETED");
+        assertThat(stepsMap.get(cancelSaga.getSagaId() + ":RELEASE_TOUR").getStatus()).isEqualTo("COMPLETED");
+
+        // Verify RefundPaymentCommand sent with 100% refund (5,000,000 VND)
+        ArgumentCaptor<Object> refundCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("REFUND_PAYMENT_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_REFUND_PAYMENT),
+                refundCaptor.capture()
+        );
+        MessageEnvelope refundEnv = (MessageEnvelope) refundCaptor.getValue();
+        RefundPaymentCommand refundCmd = (RefundPaymentCommand) refundEnv.getPayload();
+        assertThat(refundCmd.getAmount()).isEqualByComparingTo("5000000.00");
+        assertThat(refundCmd.getReason()).contains("100%");
+
+        // Verify ReleaseTourCommand sent
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_TOUR_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR),
+                any()
+        );
+    }
+
+    @Test
+    @DisplayName("Cancellation: Departure between 3 and 7 days -> 50% refund, release tour seats")
+    void cancelBooking_betweenThreeAndSevenDays_refunds50Percent() {
+        // Departure date: today + 5 days
+        mockBooking.getItems().get(0).setDepartureDateSnapshot(LocalDate.now().plusDays(5));
+        mockBooking.setStatus("CONFIRMED");
+
+        SagaInstance cancelSaga = sagaOrchestrator.cancelBooking(mockBooking);
+
+        assertThat(cancelSaga.getStatus()).isEqualTo("COMPLETED");
+
+        ArgumentCaptor<Object> refundCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("REFUND_PAYMENT_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_REFUND_PAYMENT),
+                refundCaptor.capture()
+        );
+        MessageEnvelope refundEnv = (MessageEnvelope) refundCaptor.getValue();
+        RefundPaymentCommand refundCmd = (RefundPaymentCommand) refundEnv.getPayload();
+        // 50% of 5,000,000 = 2,500,000
+        assertThat(refundCmd.getAmount()).isEqualByComparingTo("2500000.00");
+        assertThat(refundCmd.getReason()).contains("50%");
+    }
+
+    @Test
+    @DisplayName("Cancellation: Departure < 3 days -> 0% refund, still releases tour seats")
+    void cancelBooking_lessThanThreeDays_refundsZeroPercent() {
+        // Departure date: today + 1 day
+        mockBooking.getItems().get(0).setDepartureDateSnapshot(LocalDate.now().plusDays(1));
+        mockBooking.setStatus("CONFIRMED");
+
+        SagaInstance cancelSaga = sagaOrchestrator.cancelBooking(mockBooking);
+
+        assertThat(cancelSaga.getStatus()).isEqualTo("COMPLETED");
+
+        ArgumentCaptor<Object> refundCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("REFUND_PAYMENT_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_REFUND_PAYMENT),
+                refundCaptor.capture()
+        );
+        MessageEnvelope refundEnv = (MessageEnvelope) refundCaptor.getValue();
+        RefundPaymentCommand refundCmd = (RefundPaymentCommand) refundEnv.getPayload();
+        // 0% refund
+        assertThat(refundCmd.getAmount()).isEqualByComparingTo("0.00");
+        assertThat(refundCmd.getReason()).contains("0%");
+
+        // Verify tour seats are STILL released
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_TOUR_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR),
+                any()
+        );
+    }
+
+    @Test
+    @DisplayName("Cancellation: Booking with Hotel -> Releases BOTH tour seats and hotel rooms")
+    void cancelBooking_withHotel_releasesBothTourAndHotel() {
+        mockBooking.getHotelDetails().add(BookingHotelDetail.builder()
+                .hotelId(50L)
+                .roomTypeId(60L)
+                .checkInDate(LocalDate.now().plusDays(10))
+                .checkOutDate(LocalDate.now().plusDays(12))
+                .roomQuantity(1)
+                .priceSnapshot(new BigDecimal("1000000.00"))
+                .build());
+        mockBooking.getItems().get(0).setDepartureDateSnapshot(LocalDate.now().plusDays(10));
+        mockBooking.setStatus("CONFIRMED");
+
+        SagaInstance cancelSaga = sagaOrchestrator.cancelBooking(mockBooking);
+
+        assertThat(cancelSaga.getStatus()).isEqualTo("COMPLETED");
+
+        // Verify ReleaseHotelCommand sent
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_HOTEL_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_HOTEL),
+                any()
+        );
+
+        // Verify ReleaseTourCommand sent
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_TOUR_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR),
+                any()
+        );
     }
 }

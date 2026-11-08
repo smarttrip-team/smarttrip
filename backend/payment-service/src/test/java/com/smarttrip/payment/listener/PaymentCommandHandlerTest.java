@@ -3,6 +3,7 @@ package com.smarttrip.payment.listener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttrip.messaging.command.AuthorizePaymentCommand;
 import com.smarttrip.messaging.command.CapturePaymentCommand;
+import com.smarttrip.messaging.command.RefundPaymentCommand;
 import com.smarttrip.messaging.command.VoidPaymentCommand;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
@@ -177,5 +178,53 @@ class PaymentCommandHandlerTest {
         paymentCommandHandler.onPaymentCommand(envelope);
 
         verify(paymentService, times(1)).voidAuthorization(10L, "BK-PAY-1");
+    }
+
+    @Test
+    @DisplayName("Cancellation: Should process RefundPaymentCommand and credit wallet balance")
+    void handleRefund_success() {
+        when(idempotentConsumerService.markProcessedIfNew("msg-refund-1", "PaymentCommandHandler")).thenReturn(true);
+
+        RefundPaymentCommand cmd = RefundPaymentCommand.builder()
+                .bookingId(1L)
+                .bookingCode("BK-PAY-1")
+                .userId(10L)
+                .amount(new BigDecimal("3000000.00"))
+                .reason("Cancellation refund (100%)")
+                .build();
+
+        MessageEnvelope<Object> envelope = MessageEnvelope.<Object>builder()
+                .messageId("msg-refund-1")
+                .messageType("REFUND_PAYMENT_COMMAND")
+                .payload(cmd)
+                .build();
+
+        paymentCommandHandler.onPaymentCommand(envelope);
+
+        verify(paymentService, times(1)).refund(10L, "BK-PAY-1", new BigDecimal("3000000.00"), "Cancellation refund (100%)");
+    }
+
+    @Test
+    @DisplayName("Cancellation: Should skip wallet credit when refund amount is zero")
+    void handleRefund_zeroAmount_skipsCredit() {
+        when(idempotentConsumerService.markProcessedIfNew("msg-refund-zero", "PaymentCommandHandler")).thenReturn(true);
+
+        RefundPaymentCommand cmd = RefundPaymentCommand.builder()
+                .bookingId(1L)
+                .bookingCode("BK-PAY-1")
+                .userId(10L)
+                .amount(BigDecimal.ZERO)
+                .reason("Cancellation refund (0%)")
+                .build();
+
+        MessageEnvelope<Object> envelope = MessageEnvelope.<Object>builder()
+                .messageId("msg-refund-zero")
+                .messageType("REFUND_PAYMENT_COMMAND")
+                .payload(cmd)
+                .build();
+
+        paymentCommandHandler.onPaymentCommand(envelope);
+
+        verify(paymentService, never()).refund(any(), any(), any(), any());
     }
 }

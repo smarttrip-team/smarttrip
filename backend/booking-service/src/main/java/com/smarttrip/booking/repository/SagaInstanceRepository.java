@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface SagaInstanceRepository extends JpaRepository<SagaInstance, Long> {
     Optional<SagaInstance> findBySagaId(String sagaId);
+    Optional<SagaInstance> findTopByBookingIdOrderByIdDesc(Long bookingId);
     Optional<SagaInstance> findByBookingId(Long bookingId);
 }

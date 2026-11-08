@@ -178,6 +178,34 @@ public class BookingServiceImpl implements BookingService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
+    @Override
+    @Transactional
+    public BookingResponse cancelBooking(String bookingCode, Long customerId) {
+        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with code: " + bookingCode));
+
+        // 1. Verify Customer ownership (if customerId provided via header or param)
+        if (customerId != null && !booking.getCustomerId().equals(customerId)) {
+            throw new BusinessException("You are not authorized to cancel this booking");
+        }
+
+        // 1. Verify booking is in CONFIRMED status
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+            throw new BusinessException("Only CONFIRMED bookings can be cancelled. Current status: " + booking.getStatus());
+        }
+
+        // 2-4. Trigger Cancellation Saga
+        if (sagaOrchestrator != null) {
+            sagaOrchestrator.cancelBooking(booking);
+        }
+
+        // 5. Update booking status to CANCELLED
+        booking.setStatus("CANCELLED");
+        Booking saved = bookingRepository.save(booking);
+
+        log.info("Booking {} successfully cancelled by customer {}", bookingCode, customerId);
+        return mapToResponse(saved);
+    }
 
     private void validateCustomerStatus(Long customerId) {
         if (userFeignClient == null || customerId == null) {

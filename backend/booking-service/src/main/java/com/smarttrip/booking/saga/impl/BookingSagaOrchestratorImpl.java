@@ -20,8 +20,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -313,6 +318,144 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
         log.warn("Saga {} COMPENSATED (Tour and Hotel released). Booking {} status set to FAILED.", saga.getSagaId(), booking.getBookingCode());
     }
 
+    @Override
+    @Transactional
+    public SagaInstance cancelBooking(Booking booking) {
+        log.info("Starting Cancellation Saga for booking {}", booking.getBookingCode());
+
+        // 1. Create and persist SagaInstance for Cancellation
+        SagaInstance saga = SagaInstance.builder()
+                .sagaId(UUID.randomUUID().toString())
+                .bookingId(booking.getId())
+                .sagaType("BOOKING_CANCEL")
+                .status("PROCESSING")
+                .currentStep("CHECK_CANCELLATION_POLICY")
+                .startedAt(LocalDateTime.now())
+                .build();
+        sagaInstanceRepository.save(saga);
+
+        // 2. Check Cancellation Policy & calculate refund amount
+        recordStep(saga, "CHECK_CANCELLATION_POLICY", "ACTION", "PENDING");
+        LocalDate departureDate = null;
+        if (booking.getItems() != null && !booking.getItems().isEmpty()) {
+            departureDate = booking.getItems().get(0).getDepartureDateSnapshot();
+        }
+
+        double refundRate = calculateRefundRate(departureDate);
+        BigDecimal refundAmount = booking.getTotalAmount().multiply(BigDecimal.valueOf(refundRate))
+                .setScale(2, RoundingMode.HALF_UP);
+        completeStep(saga, "CHECK_CANCELLATION_POLICY");
+
+        log.info("Booking {} cancellation policy: departureDate={}, refundRate={}%, refundAmount={}",
+                booking.getBookingCode(), departureDate, refundRate * 100, refundAmount);
+
+        // 3. Send RefundPaymentCommand via Outbox
+        recordStep(saga, "REFUND_PAYMENT", "COMMAND", "PENDING");
+        RefundPaymentCommand refundCmd = RefundPaymentCommand.builder()
+                .bookingId(booking.getId())
+                .bookingCode(booking.getBookingCode())
+                .userId(booking.getCustomerId())
+                .amount(refundAmount)
+                .reason(String.format("Cancellation refund (%.0f%%) for booking %s", refundRate * 100, booking.getBookingCode()))
+                .build();
+
+        MessageEnvelope<RefundPaymentCommand> refundEnvelope = MessageEnvelope.of(
+                "REFUND_PAYMENT_COMMAND", refundCmd, saga.getSagaId()
+        );
+
+        outboxPublisher.enqueueAndPublish(
+                "BOOKING",
+                booking.getId().toString(),
+                "REFUND_PAYMENT_COMMAND",
+                RabbitMQConstants.EXCHANGE_COMMANDS,
+                RabbitMQConstants.ROUTING_KEY_REFUND_PAYMENT,
+                refundEnvelope
+        );
+        completeStep(saga, "REFUND_PAYMENT");
+        log.info("Enqueued RefundPaymentCommand via Outbox for booking {}: amount={}", booking.getBookingCode(), refundAmount);
+
+        // 4. Send ReleaseTourCommand via Outbox
+        recordStep(saga, "RELEASE_TOUR", "COMMAND", "PENDING");
+        BookingItem tourItem = booking.getItems().isEmpty() ? null : booking.getItems().get(0);
+        if (tourItem != null) {
+            ReleaseTourCommand releaseTourCmd = ReleaseTourCommand.builder()
+                    .bookingId(booking.getId())
+                    .bookingCode(booking.getBookingCode())
+                    .tourId(tourItem.getTourId())
+                    .departureId(tourItem.getDepartureId())
+                    .quantity(tourItem.getQuantity())
+                    .build();
+
+            MessageEnvelope<ReleaseTourCommand> releaseTourEnvelope = MessageEnvelope.of(
+                    "RELEASE_TOUR_COMMAND", releaseTourCmd, saga.getSagaId()
+            );
+
+            outboxPublisher.enqueueAndPublish(
+                    "BOOKING",
+                    booking.getId().toString(),
+                    "RELEASE_TOUR_COMMAND",
+                    RabbitMQConstants.EXCHANGE_COMMANDS,
+                    RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR,
+                    releaseTourEnvelope
+            );
+            log.info("Enqueued ReleaseTourCommand via Outbox for booking {}", booking.getBookingCode());
+        }
+        completeStep(saga, "RELEASE_TOUR");
+
+        // 5. Send ReleaseHotelCommand via Outbox (if applicable)
+        if (booking.getHotelDetails() != null && !booking.getHotelDetails().isEmpty()) {
+            recordStep(saga, "RELEASE_HOTEL", "COMMAND", "PENDING");
+            BookingHotelDetail hotelDetail = booking.getHotelDetails().get(0);
+            ReleaseHotelCommand releaseHotelCmd = ReleaseHotelCommand.builder()
+                    .bookingId(booking.getId())
+                    .bookingCode(booking.getBookingCode())
+                    .hotelId(hotelDetail.getHotelId())
+                    .roomTypeId(hotelDetail.getRoomTypeId())
+                    .checkInDate(hotelDetail.getCheckInDate())
+                    .checkOutDate(hotelDetail.getCheckOutDate())
+                    .roomQuantity(hotelDetail.getRoomQuantity())
+                    .build();
+
+            MessageEnvelope<ReleaseHotelCommand> releaseHotelEnvelope = MessageEnvelope.of(
+                    "RELEASE_HOTEL_COMMAND", releaseHotelCmd, saga.getSagaId()
+            );
+
+            outboxPublisher.enqueueAndPublish(
+                    "BOOKING",
+                    booking.getId().toString(),
+                    "RELEASE_HOTEL_COMMAND",
+                    RabbitMQConstants.EXCHANGE_COMMANDS,
+                    RabbitMQConstants.ROUTING_KEY_RELEASE_HOTEL,
+                    releaseHotelEnvelope
+            );
+            completeStep(saga, "RELEASE_HOTEL");
+            log.info("Enqueued ReleaseHotelCommand via Outbox for booking {}", booking.getBookingCode());
+        }
+
+        // 6. Complete Saga
+        saga.setStatus("COMPLETED");
+        saga.setCurrentStep("COMPLETED");
+        saga.setCompletedAt(LocalDateTime.now());
+        sagaInstanceRepository.save(saga);
+
+        log.info("Cancellation Saga {} completed successfully for booking {}", saga.getSagaId(), booking.getBookingCode());
+        return saga;
+    }
+
+    private double calculateRefundRate(LocalDate departureDate) {
+        if (departureDate == null) {
+            return 1.0;
+        }
+        long daysUntilDeparture = ChronoUnit.DAYS.between(LocalDate.now(), departureDate);
+        if (daysUntilDeparture > 7) {
+            return 1.0;
+        } else if (daysUntilDeparture >= 3) {
+            return 0.5;
+        } else {
+            return 0.0;
+        }
+    }
+
     private void compensateTour(SagaInstance saga, Booking booking, String causationId) {
         recordStep(saga, "COMPENSATE_TOUR", "COMPENSATION", "PENDING");
         BookingItem tourItem = booking.getItems().isEmpty() ? null : booking.getItems().get(0);
@@ -374,7 +517,7 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
     @Override
     @Transactional(readOnly = true)
     public SagaInstance getSagaByBookingId(Long bookingId) {
-        return sagaInstanceRepository.findByBookingId(bookingId)
+        return sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Saga not found for booking: " + bookingId));
     }
 
@@ -418,7 +561,7 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
             var opt = sagaInstanceRepository.findBySagaId(sagaId);
             if (opt.isPresent()) return opt.get();
         }
-        return sagaInstanceRepository.findByBookingId(bookingId)
+        return sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Saga not found for booking: " + bookingId));
     }
 

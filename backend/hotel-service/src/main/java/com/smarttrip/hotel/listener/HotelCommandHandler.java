@@ -55,7 +55,7 @@ public class HotelCommandHandler {
                 ConfirmHotelCommand cmd = messagingObjectMapper.convertValue(envelope.getPayload(), ConfirmHotelCommand.class);
                 handleConfirmHotel(cmd);
             }
-            case "RELEASE_HOTEL_COMMAND" -> {
+            case "RELEASE_HOTEL_COMMAND", "CANCEL_HOTEL_RESERVATION_COMMAND" -> {
                 ReleaseHotelCommand cmd = messagingObjectMapper.convertValue(envelope.getPayload(), ReleaseHotelCommand.class);
                 handleReleaseHotel(cmd);
             }

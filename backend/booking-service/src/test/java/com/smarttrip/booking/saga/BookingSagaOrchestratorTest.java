@@ -1,12 +1,11 @@
 package com.smarttrip.booking.saga;
 
 import com.smarttrip.booking.entity.*;
+import com.smarttrip.booking.outbox.OutboxPublisher;
 import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
 import com.smarttrip.booking.repository.SagaStepRepository;
 import com.smarttrip.booking.saga.impl.BookingSagaOrchestratorImpl;
-import com.smarttrip.messaging.command.AuthorizePaymentCommand;
-import com.smarttrip.messaging.command.ReserveHotelCommand;
 import com.smarttrip.messaging.command.ReserveTourCommand;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
@@ -21,7 +20,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -36,7 +34,7 @@ import static org.mockito.Mockito.*;
 class BookingSagaOrchestratorTest {
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private OutboxPublisher outboxPublisher;
 
     @Mock
     private BookingRepository bookingRepository;
@@ -99,7 +97,7 @@ class BookingSagaOrchestratorTest {
     }
 
     @Test
-    @DisplayName("Step 1: Should start saga, record step RESERVE_TOUR, and publish ReserveTourCommand")
+    @DisplayName("Step 1: Should start saga, record step RESERVE_TOUR, and publish ReserveTourCommand via Outbox")
     void startSaga_success() {
         sagaOrchestrator.startSaga(mockBooking, mockSaga);
 
@@ -110,14 +108,17 @@ class BookingSagaOrchestratorTest {
         assertThat(step).isNotNull();
         assertThat(step.getStatus()).isEqualTo("PENDING");
 
-        ArgumentCaptor<MessageEnvelope> captor = ArgumentCaptor.forClass(MessageEnvelope.class);
-        verify(rabbitTemplate, times(1)).convertAndSend(
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RESERVE_TOUR_COMMAND"),
                 eq(RabbitMQConstants.EXCHANGE_COMMANDS),
                 eq(RabbitMQConstants.ROUTING_KEY_RESERVE_TOUR),
                 captor.capture()
         );
 
-        MessageEnvelope envelope = captor.getValue();
+        MessageEnvelope envelope = (MessageEnvelope) captor.getValue();
         assertThat(envelope.getMessageType()).isEqualTo("RESERVE_TOUR_COMMAND");
         assertThat(envelope.getCorrelationId()).isEqualTo("saga-uuid-1");
         ReserveTourCommand payload = (ReserveTourCommand) envelope.getPayload();
@@ -151,10 +152,13 @@ class BookingSagaOrchestratorTest {
         assertThat(stepsMap.get("saga-uuid-1:RESERVE_TOUR").getStatus()).isEqualTo("COMPLETED");
         assertThat(stepsMap.get("saga-uuid-1:AUTHORIZE_PAYMENT").getStatus()).isEqualTo("PENDING");
 
-        verify(rabbitTemplate, times(1)).convertAndSend(
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("AUTHORIZE_PAYMENT_COMMAND"),
                 eq(RabbitMQConstants.EXCHANGE_COMMANDS),
                 eq(RabbitMQConstants.ROUTING_KEY_AUTHORIZE_PAYMENT),
-                any(MessageEnvelope.class)
+                any()
         );
     }
 
@@ -192,10 +196,13 @@ class BookingSagaOrchestratorTest {
         assertThat(stepsMap.get("saga-uuid-1:RESERVE_TOUR").getStatus()).isEqualTo("COMPLETED");
         assertThat(stepsMap.get("saga-uuid-1:RESERVE_HOTEL").getStatus()).isEqualTo("PENDING");
 
-        verify(rabbitTemplate, times(1)).convertAndSend(
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RESERVE_HOTEL_COMMAND"),
                 eq(RabbitMQConstants.EXCHANGE_COMMANDS),
                 eq(RabbitMQConstants.ROUTING_KEY_RESERVE_HOTEL),
-                any(MessageEnvelope.class)
+                any()
         );
     }
 
@@ -225,10 +232,13 @@ class BookingSagaOrchestratorTest {
         assertThat(stepsMap.get("saga-uuid-1:RESERVE_HOTEL").getStatus()).isEqualTo("COMPLETED");
         assertThat(stepsMap.get("saga-uuid-1:AUTHORIZE_PAYMENT").getStatus()).isEqualTo("PENDING");
 
-        verify(rabbitTemplate, times(1)).convertAndSend(
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("AUTHORIZE_PAYMENT_COMMAND"),
                 eq(RabbitMQConstants.EXCHANGE_COMMANDS),
                 eq(RabbitMQConstants.ROUTING_KEY_AUTHORIZE_PAYMENT),
-                any(MessageEnvelope.class)
+                any()
         );
     }
 
@@ -257,16 +267,22 @@ class BookingSagaOrchestratorTest {
         assertThat(stepsMap.get("saga-uuid-1:CONFIRM_RESOURCES").getStatus()).isEqualTo("COMPLETED");
         assertThat(stepsMap.get("saga-uuid-1:CAPTURE_PAYMENT").getStatus()).isEqualTo("COMPLETED");
 
-        // Verify commands sent: ConfirmTour and CapturePayment
-        verify(rabbitTemplate, times(1)).convertAndSend(
+        // Verify commands sent via Outbox: ConfirmTour and CapturePayment
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("CONFIRM_TOUR_COMMAND"),
                 eq(RabbitMQConstants.EXCHANGE_COMMANDS),
                 eq(RabbitMQConstants.ROUTING_KEY_CONFIRM_TOUR),
-                any(MessageEnvelope.class)
+                any()
         );
-        verify(rabbitTemplate, times(1)).convertAndSend(
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("CAPTURE_PAYMENT_COMMAND"),
                 eq(RabbitMQConstants.EXCHANGE_COMMANDS),
                 eq(RabbitMQConstants.ROUTING_KEY_CAPTURE_PAYMENT),
-                any(MessageEnvelope.class)
+                any()
         );
 
         // Verify booking confirmed & saga completed

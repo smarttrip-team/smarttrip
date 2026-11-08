@@ -9,12 +9,14 @@ import com.smarttrip.messaging.envelope.MessageEnvelope;
 import com.smarttrip.messaging.event.PaymentAuthorizeFailedEvent;
 import com.smarttrip.messaging.event.PaymentAuthorizedEvent;
 import com.smarttrip.payment.dto.PaymentResponse;
+import com.smarttrip.payment.idempotency.IdempotentConsumerService;
+import com.smarttrip.payment.outbox.OutboxPublisher;
 import com.smarttrip.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -22,12 +24,20 @@ import org.springframework.stereotype.Component;
 public class PaymentCommandHandler {
 
     private final PaymentService paymentService;
-    private final RabbitTemplate rabbitTemplate;
+    private final IdempotentConsumerService idempotentConsumerService;
+    private final OutboxPublisher outboxPublisher;
     private final ObjectMapper messagingObjectMapper;
 
     @RabbitListener(queues = RabbitMQConstants.QUEUE_PAYMENT_COMMANDS)
+    @Transactional
     public void onPaymentCommand(MessageEnvelope<Object> envelope) {
         if (envelope == null || envelope.getMessageType() == null) {
+            return;
+        }
+
+        // Idempotency check: Ignore duplicate messages
+        if (!idempotentConsumerService.markProcessedIfNew(envelope.getMessageId(), "PaymentCommandHandler")) {
+            log.warn("PaymentCommandHandler skipped duplicate command messageId={}", envelope.getMessageId());
             return;
         }
 
@@ -61,12 +71,19 @@ public class PaymentCommandHandler {
                     .authorizedAmount(cmd.getAmount())
                     .build();
 
-            rabbitTemplate.convertAndSend(
+            MessageEnvelope<PaymentAuthorizedEvent> evtEnvelope = MessageEnvelope.of(
+                    "PAYMENT_AUTHORIZED_EVENT", event, correlationId, causationId
+            );
+
+            outboxPublisher.enqueueAndPublish(
+                    "Payment",
+                    response.getId().toString(),
+                    "PAYMENT_AUTHORIZED_EVENT",
                     RabbitMQConstants.EXCHANGE_EVENTS,
                     RabbitMQConstants.ROUTING_KEY_PAYMENT_AUTHORIZED,
-                    MessageEnvelope.of("PAYMENT_AUTHORIZED_EVENT", event, correlationId, causationId)
+                    evtEnvelope
             );
-            log.info("Payment authorized for booking {}. Emitted PaymentAuthorizedEvent.", cmd.getBookingCode());
+            log.info("Payment authorized for booking {}. Emitted PaymentAuthorizedEvent via outbox.", cmd.getBookingCode());
         } catch (Exception e) {
             log.error("Failed to authorize payment for booking {}: {}", cmd.getBookingCode(), e.getMessage());
             PaymentAuthorizeFailedEvent failEvent = PaymentAuthorizeFailedEvent.builder()
@@ -75,10 +92,17 @@ public class PaymentCommandHandler {
                     .reason(e.getMessage())
                     .build();
 
-            rabbitTemplate.convertAndSend(
+            MessageEnvelope<PaymentAuthorizeFailedEvent> evtEnvelope = MessageEnvelope.of(
+                    "PAYMENT_AUTHORIZE_FAILED_EVENT", failEvent, correlationId, causationId
+            );
+
+            outboxPublisher.enqueueAndPublish(
+                    "Payment",
+                    cmd.getBookingId().toString(),
+                    "PAYMENT_AUTHORIZE_FAILED_EVENT",
                     RabbitMQConstants.EXCHANGE_EVENTS,
                     RabbitMQConstants.ROUTING_KEY_PAYMENT_AUTHORIZE_FAILED,
-                    MessageEnvelope.of("PAYMENT_AUTHORIZE_FAILED_EVENT", failEvent, correlationId, causationId)
+                    evtEnvelope
             );
         }
     }

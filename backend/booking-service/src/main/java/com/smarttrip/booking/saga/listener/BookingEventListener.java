@@ -5,9 +5,7 @@ import com.smarttrip.booking.idempotency.IdempotentConsumerService;
 import com.smarttrip.booking.saga.BookingSagaOrchestrator;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
-import com.smarttrip.messaging.event.HotelReservedEvent;
-import com.smarttrip.messaging.event.PaymentAuthorizedEvent;
-import com.smarttrip.messaging.event.TourReservedEvent;
+import com.smarttrip.messaging.event.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -62,6 +60,39 @@ public class BookingEventListener {
             case "PAYMENT_AUTHORIZED_EVENT" -> {
                 PaymentAuthorizedEvent event = messagingObjectMapper.convertValue(envelope.getPayload(), PaymentAuthorizedEvent.class);
                 sagaOrchestrator.handlePaymentAuthorized(MessageEnvelope.<PaymentAuthorizedEvent>builder()
+                        .messageId(envelope.getMessageId())
+                        .correlationId(envelope.getCorrelationId())
+                        .causationId(envelope.getCausationId())
+                        .messageType(envelope.getMessageType())
+                        .occurredAt(envelope.getOccurredAt())
+                        .payload(event)
+                        .build());
+            }
+            case "TOUR_RESERVE_FAILED_EVENT" -> {
+                TourReserveFailedEvent event = messagingObjectMapper.convertValue(envelope.getPayload(), TourReserveFailedEvent.class);
+                sagaOrchestrator.handleTourReserveFailed(MessageEnvelope.<TourReserveFailedEvent>builder()
+                        .messageId(envelope.getMessageId())
+                        .correlationId(envelope.getCorrelationId())
+                        .causationId(envelope.getCausationId())
+                        .messageType(envelope.getMessageType())
+                        .occurredAt(envelope.getOccurredAt())
+                        .payload(event)
+                        .build());
+            }
+            case "HOTEL_RESERVE_FAILED_EVENT" -> {
+                HotelReserveFailedEvent event = messagingObjectMapper.convertValue(envelope.getPayload(), HotelReserveFailedEvent.class);
+                sagaOrchestrator.handleHotelReserveFailed(MessageEnvelope.<HotelReserveFailedEvent>builder()
+                        .messageId(envelope.getMessageId())
+                        .correlationId(envelope.getCorrelationId())
+                        .causationId(envelope.getCausationId())
+                        .messageType(envelope.getMessageType())
+                        .occurredAt(envelope.getOccurredAt())
+                        .payload(event)
+                        .build());
+            }
+            case "PAYMENT_AUTHORIZE_FAILED_EVENT" -> {
+                PaymentAuthorizeFailedEvent event = messagingObjectMapper.convertValue(envelope.getPayload(), PaymentAuthorizeFailedEvent.class);
+                sagaOrchestrator.handlePaymentAuthorizeFailed(MessageEnvelope.<PaymentAuthorizeFailedEvent>builder()
                         .messageId(envelope.getMessageId())
                         .correlationId(envelope.getCorrelationId())
                         .causationId(envelope.getCausationId())

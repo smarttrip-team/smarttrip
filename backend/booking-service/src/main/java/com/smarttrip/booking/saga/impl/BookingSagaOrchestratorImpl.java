@@ -14,9 +14,7 @@ import com.smarttrip.booking.saga.BookingSagaOrchestrator;
 import com.smarttrip.messaging.command.*;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
-import com.smarttrip.messaging.event.HotelReservedEvent;
-import com.smarttrip.messaging.event.PaymentAuthorizedEvent;
-import com.smarttrip.messaging.event.TourReservedEvent;
+import com.smarttrip.messaging.event.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -230,6 +228,150 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
     }
 
     @Override
+    @Transactional
+    public void handleTourReserveFailed(MessageEnvelope<TourReserveFailedEvent> envelope) {
+        String sagaId = envelope.getCorrelationId();
+        TourReserveFailedEvent event = envelope.getPayload();
+        log.warn("Saga {}: Received TourReserveFailedEvent for booking {}: {}", sagaId, event.getBookingCode(), event.getReason());
+
+        SagaInstance saga = findSaga(sagaId, event.getBookingId());
+        failStep(saga, "RESERVE_TOUR", event.getReason());
+
+        Booking booking = bookingRepository.findById(event.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + event.getBookingId()));
+
+        booking.setStatus("FAILED");
+        bookingRepository.save(booking);
+
+        saga.setStatus("COMPENSATED");
+        saga.setCurrentStep("FAILED");
+        saga.setFailureReason(event.getReason());
+        saga.setCompletedAt(LocalDateTime.now());
+        sagaInstanceRepository.save(saga);
+
+        log.warn("Saga {} marked COMPENSATED. Booking {} status set to FAILED.", saga.getSagaId(), booking.getBookingCode());
+    }
+
+    @Override
+    @Transactional
+    public void handleHotelReserveFailed(MessageEnvelope<HotelReserveFailedEvent> envelope) {
+        String sagaId = envelope.getCorrelationId();
+        HotelReserveFailedEvent event = envelope.getPayload();
+        log.warn("Saga {}: Received HotelReserveFailedEvent for booking {}: {}", sagaId, event.getBookingCode(), event.getReason());
+
+        SagaInstance saga = findSaga(sagaId, event.getBookingId());
+        failStep(saga, "RESERVE_HOTEL", event.getReason());
+
+        Booking booking = bookingRepository.findById(event.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + event.getBookingId()));
+
+        // Compensate Tour
+        compensateTour(saga, booking, envelope.getMessageId());
+
+        booking.setStatus("FAILED");
+        bookingRepository.save(booking);
+
+        saga.setStatus("COMPENSATED");
+        saga.setCurrentStep("COMPENSATED");
+        saga.setFailureReason(event.getReason());
+        saga.setCompletedAt(LocalDateTime.now());
+        sagaInstanceRepository.save(saga);
+
+        log.warn("Saga {} COMPENSATED (Tour released). Booking {} status set to FAILED.", saga.getSagaId(), booking.getBookingCode());
+    }
+
+    @Override
+    @Transactional
+    public void handlePaymentAuthorizeFailed(MessageEnvelope<PaymentAuthorizeFailedEvent> envelope) {
+        String sagaId = envelope.getCorrelationId();
+        PaymentAuthorizeFailedEvent event = envelope.getPayload();
+        log.warn("Saga {}: Received PaymentAuthorizeFailedEvent for booking {}: {}", sagaId, event.getBookingCode(), event.getReason());
+
+        SagaInstance saga = findSaga(sagaId, event.getBookingId());
+        failStep(saga, "AUTHORIZE_PAYMENT", event.getReason());
+
+        Booking booking = bookingRepository.findById(event.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + event.getBookingId()));
+
+        // Compensate Tour
+        compensateTour(saga, booking, envelope.getMessageId());
+
+        // Compensate Hotel if applicable
+        if (booking.getHotelDetails() != null && !booking.getHotelDetails().isEmpty()) {
+            compensateHotel(saga, booking, envelope.getMessageId());
+        }
+
+        booking.setStatus("FAILED");
+        bookingRepository.save(booking);
+
+        saga.setStatus("COMPENSATED");
+        saga.setCurrentStep("COMPENSATED");
+        saga.setFailureReason(event.getReason());
+        saga.setCompletedAt(LocalDateTime.now());
+        sagaInstanceRepository.save(saga);
+
+        log.warn("Saga {} COMPENSATED (Tour and Hotel released). Booking {} status set to FAILED.", saga.getSagaId(), booking.getBookingCode());
+    }
+
+    private void compensateTour(SagaInstance saga, Booking booking, String causationId) {
+        recordStep(saga, "COMPENSATE_TOUR", "COMPENSATION", "PENDING");
+        BookingItem tourItem = booking.getItems().isEmpty() ? null : booking.getItems().get(0);
+        if (tourItem != null) {
+            ReleaseTourCommand releaseCmd = ReleaseTourCommand.builder()
+                    .bookingId(booking.getId())
+                    .bookingCode(booking.getBookingCode())
+                    .tourId(tourItem.getTourId())
+                    .departureId(tourItem.getDepartureId())
+                    .quantity(tourItem.getQuantity())
+                    .build();
+
+            MessageEnvelope<ReleaseTourCommand> releaseEnvelope = MessageEnvelope.of(
+                    "RELEASE_TOUR_COMMAND", releaseCmd, saga.getSagaId(), causationId
+            );
+
+            outboxPublisher.enqueueAndPublish(
+                    "BOOKING",
+                    booking.getId().toString(),
+                    "RELEASE_TOUR_COMMAND",
+                    RabbitMQConstants.EXCHANGE_COMMANDS,
+                    RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR,
+                    releaseEnvelope
+            );
+            log.info("Enqueued ReleaseTourCommand via Outbox for booking {}", booking.getBookingCode());
+        }
+        completeStep(saga, "COMPENSATE_TOUR");
+    }
+
+    private void compensateHotel(SagaInstance saga, Booking booking, String causationId) {
+        recordStep(saga, "COMPENSATE_HOTEL", "COMPENSATION", "PENDING");
+        BookingHotelDetail hotelDetail = booking.getHotelDetails().get(0);
+        ReleaseHotelCommand releaseCmd = ReleaseHotelCommand.builder()
+                .bookingId(booking.getId())
+                .bookingCode(booking.getBookingCode())
+                .hotelId(hotelDetail.getHotelId())
+                .roomTypeId(hotelDetail.getRoomTypeId())
+                .checkInDate(hotelDetail.getCheckInDate())
+                .checkOutDate(hotelDetail.getCheckOutDate())
+                .roomQuantity(hotelDetail.getRoomQuantity())
+                .build();
+
+        MessageEnvelope<ReleaseHotelCommand> releaseEnvelope = MessageEnvelope.of(
+                "RELEASE_HOTEL_COMMAND", releaseCmd, saga.getSagaId(), causationId
+        );
+
+        outboxPublisher.enqueueAndPublish(
+                "BOOKING",
+                booking.getId().toString(),
+                "RELEASE_HOTEL_COMMAND",
+                RabbitMQConstants.EXCHANGE_COMMANDS,
+                RabbitMQConstants.ROUTING_KEY_RELEASE_HOTEL,
+                releaseEnvelope
+        );
+        log.info("Enqueued ReleaseHotelCommand via Outbox for booking {}", booking.getBookingCode());
+        completeStep(saga, "COMPENSATE_HOTEL");
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public SagaInstance getSagaByBookingId(Long bookingId) {
         return sagaInstanceRepository.findByBookingId(bookingId)
@@ -299,5 +441,18 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                     step.setCompletedAt(LocalDateTime.now());
                     sagaStepRepository.save(step);
                 });
+    }
+
+    private void failStep(SagaInstance saga, String stepName, String reason) {
+        SagaStep step = sagaStepRepository.findBySagaInstanceSagaIdAndStepName(saga.getSagaId(), stepName)
+                .orElseGet(() -> SagaStep.builder()
+                        .sagaInstance(saga)
+                        .stepName(stepName)
+                        .actionType("COMMAND")
+                        .build());
+        step.setStatus("FAILED");
+        step.setLastError(reason);
+        step.setCompletedAt(LocalDateTime.now());
+        sagaStepRepository.save(step);
     }
 }

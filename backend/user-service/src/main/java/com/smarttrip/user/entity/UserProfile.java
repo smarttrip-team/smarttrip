@@ -2,6 +2,9 @@ package com.smarttrip.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -21,7 +24,7 @@ public class UserProfile {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(name = "full_name", length = 150)
+    @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
     @Column(length = 30)
@@ -30,9 +33,11 @@ public class UserProfile {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @UpdateTimestamp
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

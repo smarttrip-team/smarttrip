@@ -1,5 +1,6 @@
 package com.smarttrip.user.entity;
 
+import com.smarttrip.user.enums.RoleName;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -16,6 +17,7 @@ public class Role {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
-    private String name;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50, unique = true, nullable = false)
+    private RoleName name;
 }

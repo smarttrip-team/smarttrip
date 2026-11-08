@@ -17,4 +17,8 @@ public class UserStatusDto {
     private String status;
     private boolean active;
     private Set<String> roles;
+
+    public boolean isBlocked() {
+        return "BLOCKED".equalsIgnoreCase(status) || !active;
+    }
 }

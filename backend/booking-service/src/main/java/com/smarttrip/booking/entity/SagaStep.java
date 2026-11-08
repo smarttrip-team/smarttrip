@@ -38,8 +38,9 @@ public class SagaStep {
     @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
 
-    @Column(name = "started_at", insertable = false, updatable = false)
-    private LocalDateTime startedAt;
+    @Column(name = "started_at")
+    @Builder.Default
+    private LocalDateTime startedAt = LocalDateTime.now();
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;

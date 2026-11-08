@@ -24,4 +24,8 @@ public class DepartureSnapshotDto {
     private Integer availableSeats;
     private String status;
     private boolean active;
+
+    public String getTourName() {
+        return tourTitle;
+    }
 }

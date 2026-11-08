@@ -1,7 +1,11 @@
 package com.smarttrip.tour.entity;
 
+import com.smarttrip.tour.enums.ReservationStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,26 +21,26 @@ public class TourReservation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "booking_id", nullable = false, length = 100)
-    private String bookingId;
+    @Column(name = "booking_id", nullable = false)
+    private Long bookingId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "departure_id", nullable = false)
     private TourDeparture departure;
 
-    @Column(nullable = false)
-    private Integer quantity;
+    @Column(name = "seats_booked", nullable = false)
+    private Integer seatsBooked;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private String status = "PENDING";
+    private ReservationStatus status = ReservationStatus.PENDING;
 
-    @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
-
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @UpdateTimestamp
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

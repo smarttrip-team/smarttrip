@@ -21,6 +21,9 @@ public class Payment {
     @Column(name = "booking_id", nullable = false, unique = true, length = 100)
     private String bookingId;
 
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 

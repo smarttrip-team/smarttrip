@@ -11,6 +11,7 @@ import com.smarttrip.booking.exception.ResourceNotFoundException;
 import com.smarttrip.booking.exception.UserBlockedException;
 import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
+import com.smarttrip.booking.saga.BookingSagaOrchestrator;
 import com.smarttrip.booking.service.BookingService;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class BookingServiceImpl implements BookingService {
     private final SagaInstanceRepository sagaInstanceRepository;
     private final UserFeignClient userFeignClient;
     private final TourFeignClient tourFeignClient;
+    private final BookingSagaOrchestrator sagaOrchestrator;
 
     @Override
     @Transactional
@@ -147,6 +149,11 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         sagaInstanceRepository.save(saga);
 
+        // Trigger Booking Saga Orchestrator
+        if (sagaOrchestrator != null) {
+            sagaOrchestrator.startSaga(savedBooking, saga);
+        }
+
         log.info("Created booking {} with status PENDING, total amount: {} VND",
                 savedBooking.getBookingCode(), savedBooking.getTotalAmount());
 
@@ -178,15 +185,18 @@ public class BookingServiceImpl implements BookingService {
         }
         try {
             UserStatusDto status = userFeignClient.getUserStatus(customerId);
-            if (status != null && (!status.isActive() || "BLOCKED".equalsIgnoreCase(status.getStatus()))) {
-                throw new UserBlockedException("User account is BLOCKED. Booking rejected.");
+            if (status != null && status.isBlocked()) {
+                log.warn("Blocked user {} attempted to create booking", customerId);
+                throw new UserBlockedException(customerId, status.getStatus());
             }
-        } catch (UserBlockedException ex) {
-            throw ex;
-        } catch (FeignException.NotFound ex) {
+        } catch (UserBlockedException e) {
+            throw e;
+        } catch (FeignException.NotFound e) {
+            log.warn("User {} not found via OpenFeign, rejecting booking", customerId);
             throw new ResourceNotFoundException("Customer not found with id: " + customerId);
-        } catch (Exception ex) {
-            log.warn("User Feign client call failed or skipped in standalone mode: {}", ex.getMessage());
+        } catch (FeignException e) {
+            log.error("OpenFeign user-service call failed: status={}, message={}", e.status(), e.getMessage());
+            throw new BusinessException("Unable to verify user account status, please retry later");
         }
     }
 
@@ -196,27 +206,40 @@ public class BookingServiceImpl implements BookingService {
         }
         try {
             DepartureSnapshotDto snapshot = tourFeignClient.getDepartureSnapshot(request.getDepartureId());
-            if (snapshot != null) {
-                if (!snapshot.isActive()) {
-                    throw new BusinessException("Tour departure is not active for booking");
-                }
-                if (snapshot.getAvailableSeats() != null && snapshot.getAvailableSeats() < request.getQuantity()) {
-                    throw new BusinessException("Not enough available seats. Required: " 
-                            + request.getQuantity() + ", Available: " + snapshot.getAvailableSeats());
-                }
-                if (snapshot.getPrice() != null && request.getUnitPrice() == null) {
-                    request.setUnitPrice(snapshot.getPrice());
-                }
-                if (snapshot.getTourTitle() != null && (request.getTourName() == null || request.getTourName().isBlank())) {
-                    request.setTourName(snapshot.getTourTitle());
-                }
+            if (snapshot == null) {
+                throw new ResourceNotFoundException("Tour departure not found: " + request.getDepartureId());
             }
-        } catch (BusinessException ex) {
-            throw ex;
-        } catch (FeignException.NotFound ex) {
+            if (request.getQuantity() != null && snapshot.getAvailableSeats() != null
+                    && snapshot.getAvailableSeats() < request.getQuantity()) {
+                log.warn("Not enough available seats for departure {}: requested={}, available={}",
+                        request.getDepartureId(), request.getQuantity(), snapshot.getAvailableSeats());
+                throw new BusinessException(String.format(
+                        "Not enough available seats: requested %d, available %d",
+                        request.getQuantity(), snapshot.getAvailableSeats()));
+            }
+
+            if (snapshot.getTourId() != null) {
+                request.setTourId(snapshot.getTourId());
+            }
+            if (snapshot.getTourName() != null && !snapshot.getTourName().isBlank()) {
+                request.setTourName(snapshot.getTourName());
+            }
+            if (snapshot.getDepartureDate() != null) {
+                request.setDepartureDate(snapshot.getDepartureDate());
+            }
+            if (snapshot.getPrice() != null) {
+                request.setUnitPrice(snapshot.getPrice());
+            }
+            log.info("Validated departure {} via OpenFeign, using authoritative snapshot price={}",
+                    request.getDepartureId(), snapshot.getPrice());
+        } catch (BusinessException | ResourceNotFoundException e) {
+            throw e;
+        } catch (FeignException.NotFound e) {
+            log.warn("Tour departure {} not found via OpenFeign", request.getDepartureId());
             throw new ResourceNotFoundException("Tour departure not found with id: " + request.getDepartureId());
-        } catch (Exception ex) {
-            log.warn("Tour Feign client call failed or skipped in standalone mode: {}", ex.getMessage());
+        } catch (FeignException e) {
+            log.error("OpenFeign tour-service call failed: status={}, message={}", e.status(), e.getMessage());
+            throw new BusinessException("Unable to verify tour departure, please retry later");
         }
     }
 

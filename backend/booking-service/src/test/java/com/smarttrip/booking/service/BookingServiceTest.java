@@ -13,6 +13,7 @@ import com.smarttrip.booking.exception.ResourceNotFoundException;
 import com.smarttrip.booking.exception.UserBlockedException;
 import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
+import com.smarttrip.booking.saga.BookingSagaOrchestrator;
 import com.smarttrip.booking.service.impl.BookingServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,6 +47,9 @@ class BookingServiceTest {
 
     @Mock
     private TourFeignClient tourFeignClient;
+
+    @Mock
+    private BookingSagaOrchestrator sagaOrchestrator;
 
     @InjectMocks
     private BookingServiceImpl bookingService;
@@ -122,6 +125,8 @@ class BookingServiceTest {
         assertThat(capturedSaga.getSagaType()).isEqualTo("BOOKING_CREATE");
         assertThat(capturedSaga.getStatus()).isEqualTo("STARTED");
         assertThat(capturedSaga.getCurrentStep()).isEqualTo("PENDING_CONFIRMATION");
+
+        verify(sagaOrchestrator, times(1)).startSaga(any(Booking.class), any(SagaInstance.class));
     }
 
     @Test

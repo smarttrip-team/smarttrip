@@ -11,12 +11,13 @@ import com.smarttrip.messaging.event.TourReservedEvent;
 import com.smarttrip.tour.entity.TourDeparture;
 import com.smarttrip.tour.entity.TourReservation;
 import com.smarttrip.tour.enums.ReservationStatus;
+import com.smarttrip.tour.idempotency.IdempotentConsumerService;
+import com.smarttrip.tour.outbox.OutboxPublisher;
 import com.smarttrip.tour.repository.TourDepartureRepository;
 import com.smarttrip.tour.repository.TourReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,13 +31,20 @@ public class TourCommandHandler {
 
     private final TourDepartureRepository tourDepartureRepository;
     private final TourReservationRepository tourReservationRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final IdempotentConsumerService idempotentConsumerService;
+    private final OutboxPublisher outboxPublisher;
     private final ObjectMapper messagingObjectMapper;
 
     @RabbitListener(queues = RabbitMQConstants.QUEUE_TOUR_COMMANDS)
     @Transactional
     public void onTourCommand(MessageEnvelope<Object> envelope) {
         if (envelope == null || envelope.getMessageType() == null) {
+            return;
+        }
+
+        // Idempotency check: Ignore duplicate messages
+        if (!idempotentConsumerService.markProcessedIfNew(envelope.getMessageId(), "TourCommandHandler")) {
+            log.warn("TourCommandHandler skipped duplicate command messageId={}", envelope.getMessageId());
             return;
         }
 
@@ -101,12 +109,15 @@ public class TourCommandHandler {
                 "TOUR_RESERVED_EVENT", event, correlationId, causationId
         );
 
-        rabbitTemplate.convertAndSend(
+        outboxPublisher.enqueueAndPublish(
+                "TourReservation",
+                savedRes.getId().toString(),
+                "TOUR_RESERVED_EVENT",
                 RabbitMQConstants.EXCHANGE_EVENTS,
                 RabbitMQConstants.ROUTING_KEY_TOUR_RESERVED,
                 evtEnvelope
         );
-        log.info("Tour reserved successfully for booking {}. Emitted TourReservedEvent.", cmd.getBookingCode());
+        log.info("Tour reserved successfully for booking {}. Emitted TourReservedEvent via outbox.", cmd.getBookingCode());
     }
 
     private void handleConfirmTour(ConfirmTourCommand cmd) {
@@ -137,10 +148,18 @@ public class TourCommandHandler {
                 .departureId(cmd.getDepartureId())
                 .reason(reason)
                 .build();
-        rabbitTemplate.convertAndSend(
+
+        MessageEnvelope<TourReserveFailedEvent> evtEnvelope = MessageEnvelope.of(
+                "TOUR_RESERVE_FAILED_EVENT", event, correlationId, causationId
+        );
+
+        outboxPublisher.enqueueAndPublish(
+                "TourReservation",
+                cmd.getBookingId().toString(),
+                "TOUR_RESERVE_FAILED_EVENT",
                 RabbitMQConstants.EXCHANGE_EVENTS,
                 RabbitMQConstants.ROUTING_KEY_TOUR_RESERVE_FAILED,
-                MessageEnvelope.of("TOUR_RESERVE_FAILED_EVENT", event, correlationId, causationId)
+                evtEnvelope
         );
         log.warn("Tour reservation failed for booking {}: {}", cmd.getBookingCode(), reason);
     }

@@ -6,6 +6,7 @@ import com.smarttrip.booking.entity.BookingItem;
 import com.smarttrip.booking.entity.SagaInstance;
 import com.smarttrip.booking.entity.SagaStep;
 import com.smarttrip.booking.exception.ResourceNotFoundException;
+import com.smarttrip.booking.outbox.OutboxPublisher;
 import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
 import com.smarttrip.booking.repository.SagaStepRepository;
@@ -18,7 +19,6 @@ import com.smarttrip.messaging.event.PaymentAuthorizedEvent;
 import com.smarttrip.messaging.event.TourReservedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +30,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final OutboxPublisher outboxPublisher;
     private final BookingRepository bookingRepository;
     private final SagaInstanceRepository sagaInstanceRepository;
     private final SagaStepRepository sagaStepRepository;
@@ -47,7 +47,7 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
         // Record step
         recordStep(saga, "RESERVE_TOUR", "COMMAND", "PENDING");
 
-        // Send ReserveTourCommand
+        // Send ReserveTourCommand via Transactional Outbox
         BookingItem tourItem = booking.getItems().isEmpty() ? null : booking.getItems().get(0);
         if (tourItem != null) {
             ReserveTourCommand cmd = ReserveTourCommand.builder()
@@ -62,12 +62,15 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                     "RESERVE_TOUR_COMMAND", cmd, saga.getSagaId()
             );
 
-            rabbitTemplate.convertAndSend(
+            outboxPublisher.enqueueAndPublish(
+                    "BOOKING",
+                    booking.getId().toString(),
+                    "RESERVE_TOUR_COMMAND",
                     RabbitMQConstants.EXCHANGE_COMMANDS,
                     RabbitMQConstants.ROUTING_KEY_RESERVE_TOUR,
                     envelope
             );
-            log.info("Sent ReserveTourCommand for booking {}", booking.getBookingCode());
+            log.info("Enqueued ReserveTourCommand via Outbox for booking {}", booking.getBookingCode());
         }
     }
 
@@ -107,12 +110,15 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                     "RESERVE_HOTEL_COMMAND", cmd, saga.getSagaId(), envelope.getMessageId()
             );
 
-            rabbitTemplate.convertAndSend(
+            outboxPublisher.enqueueAndPublish(
+                    "BOOKING",
+                    booking.getId().toString(),
+                    "RESERVE_HOTEL_COMMAND",
                     RabbitMQConstants.EXCHANGE_COMMANDS,
                     RabbitMQConstants.ROUTING_KEY_RESERVE_HOTEL,
                     hotelEnvelope
             );
-            log.info("Sent ReserveHotelCommand for booking {}", booking.getBookingCode());
+            log.info("Enqueued ReserveHotelCommand via Outbox for booking {}", booking.getBookingCode());
         } else {
             // No hotel: directly authorize payment
             triggerAuthorizePayment(saga, booking, envelope.getMessageId());
@@ -160,7 +166,10 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                     .departureId(tourItem.getDepartureId())
                     .quantity(tourItem.getQuantity())
                     .build();
-            rabbitTemplate.convertAndSend(
+            outboxPublisher.enqueueAndPublish(
+                    "BOOKING",
+                    booking.getId().toString(),
+                    "CONFIRM_TOUR_COMMAND",
                     RabbitMQConstants.EXCHANGE_COMMANDS,
                     RabbitMQConstants.ROUTING_KEY_CONFIRM_TOUR,
                     MessageEnvelope.of("CONFIRM_TOUR_COMMAND", confirmTourCmd, saga.getSagaId())
@@ -178,7 +187,10 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                     .checkOutDate(hotelDetail.getCheckOutDate())
                     .roomQuantity(hotelDetail.getRoomQuantity())
                     .build();
-            rabbitTemplate.convertAndSend(
+            outboxPublisher.enqueueAndPublish(
+                    "BOOKING",
+                    booking.getId().toString(),
+                    "CONFIRM_HOTEL_COMMAND",
                     RabbitMQConstants.EXCHANGE_COMMANDS,
                     RabbitMQConstants.ROUTING_KEY_CONFIRM_HOTEL,
                     MessageEnvelope.of("CONFIRM_HOTEL_COMMAND", confirmHotelCmd, saga.getSagaId())
@@ -194,7 +206,10 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                 .userId(booking.getCustomerId())
                 .amount(booking.getTotalAmount())
                 .build();
-        rabbitTemplate.convertAndSend(
+        outboxPublisher.enqueueAndPublish(
+                "BOOKING",
+                booking.getId().toString(),
+                "CAPTURE_PAYMENT_COMMAND",
                 RabbitMQConstants.EXCHANGE_COMMANDS,
                 RabbitMQConstants.ROUTING_KEY_CAPTURE_PAYMENT,
                 MessageEnvelope.of("CAPTURE_PAYMENT_COMMAND", captureCmd, saga.getSagaId())
@@ -244,12 +259,15 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                 "AUTHORIZE_PAYMENT_COMMAND", cmd, saga.getSagaId(), causationId
         );
 
-        rabbitTemplate.convertAndSend(
+        outboxPublisher.enqueueAndPublish(
+                "BOOKING",
+                booking.getId().toString(),
+                "AUTHORIZE_PAYMENT_COMMAND",
                 RabbitMQConstants.EXCHANGE_COMMANDS,
                 RabbitMQConstants.ROUTING_KEY_AUTHORIZE_PAYMENT,
                 payEnvelope
         );
-        log.info("Sent AuthorizePaymentCommand for booking {}: amount={}",
+        log.info("Enqueued AuthorizePaymentCommand via Outbox for booking {}: amount={}",
                 booking.getBookingCode(), booking.getTotalAmount());
     }
 

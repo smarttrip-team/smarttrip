@@ -1,6 +1,7 @@
 package com.smarttrip.booking.saga.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarttrip.booking.idempotency.IdempotentConsumerService;
 import com.smarttrip.booking.saga.BookingSagaOrchestrator;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
@@ -19,10 +20,17 @@ public class BookingEventListener {
 
     private final BookingSagaOrchestrator sagaOrchestrator;
     private final ObjectMapper messagingObjectMapper;
+    private final IdempotentConsumerService idempotentConsumerService;
 
     @RabbitListener(queues = RabbitMQConstants.QUEUE_BOOKING_EVENTS)
     public void onEvent(MessageEnvelope<Object> envelope) {
         if (envelope == null || envelope.getMessageType() == null) {
+            return;
+        }
+
+        // Idempotent check
+        if (!idempotentConsumerService.markProcessedIfNew(envelope.getMessageId(), "BookingEventListener")) {
+            log.info("Event {} already processed by BookingEventListener. Skipping duplicate.", envelope.getMessageId());
             return;
         }
 

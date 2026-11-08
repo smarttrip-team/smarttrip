@@ -1,6 +1,7 @@
 package com.smarttrip.hotel.exception;
 
 import com.smarttrip.hotel.dto.ErrorResponse;
+import feign.FeignException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -47,6 +48,21 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(FeignException.class)
+    public ResponseEntity<ErrorResponse> handleFeignException(FeignException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.status());
+        if (status == null) {
+            status = HttpStatus.BAD_GATEWAY;
+        }
+        ErrorResponse error = ErrorResponse.builder()
+                .status(status.value())
+                .error("Downstream Service Error")
+                .message("Error communicating with downstream service: " + ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(status).body(error);
     }
 
     @ExceptionHandler(Exception.class)

@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: hotel-service
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 2000
+            readTimeout: 3000
+            loggerLevel: basic
   datasource:
     url: ${HOTEL_DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/smarttrip_hotel_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     username: ${DB_USER:smarttrip}

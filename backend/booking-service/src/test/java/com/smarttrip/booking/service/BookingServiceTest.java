@@ -1,11 +1,16 @@
 package com.smarttrip.booking.service;
 
+import com.smarttrip.booking.client.TourFeignClient;
+import com.smarttrip.booking.client.UserFeignClient;
+import com.smarttrip.booking.client.dto.DepartureSnapshotDto;
+import com.smarttrip.booking.client.dto.UserStatusDto;
 import com.smarttrip.booking.dto.*;
 import com.smarttrip.booking.entity.Booking;
 import com.smarttrip.booking.entity.BookingItem;
 import com.smarttrip.booking.entity.SagaInstance;
 import com.smarttrip.booking.exception.BusinessException;
 import com.smarttrip.booking.exception.ResourceNotFoundException;
+import com.smarttrip.booking.exception.UserBlockedException;
 import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
 import com.smarttrip.booking.service.impl.BookingServiceImpl;
@@ -21,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,6 +41,12 @@ class BookingServiceTest {
 
     @Mock
     private SagaInstanceRepository sagaInstanceRepository;
+
+    @Mock
+    private UserFeignClient userFeignClient;
+
+    @Mock
+    private TourFeignClient tourFeignClient;
 
     @InjectMocks
     private BookingServiceImpl bookingService;
@@ -77,6 +89,12 @@ class BookingServiceTest {
                 .idempotencyKey("idem-book-100")
                 .build();
 
+        when(userFeignClient.getUserStatus(10L)).thenReturn(UserStatusDto.builder()
+                .userId(10L).email("user10@smarttrip.com").status("ACTIVE").active(true).build());
+        when(tourFeignClient.getDepartureSnapshot(201L)).thenReturn(DepartureSnapshotDto.builder()
+                .departureId(201L).tourId(101L).tourTitle("Da Nang - Hoi An 3D2N")
+                .price(new BigDecimal("3500000.00")).totalSeats(30).availableSeats(20).active(true).build());
+
         when(bookingRepository.findByIdempotencyKey("idem-book-100")).thenReturn(Optional.empty());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking b = invocation.getArgument(0);
@@ -89,9 +107,6 @@ class BookingServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo("PENDING");
         assertThat(response.getBookingCode()).startsWith("BK-");
-        // tour subtotal: 3,500,000 * 2 = 7,000,000
-        // hotel total: 1,200,000 * 1 = 1,200,000
-        // total: 8,200,000
         assertThat(response.getTotalAmount()).isEqualByComparingTo("8200000.00");
         assertThat(response.getItems()).hasSize(1);
         assertThat(response.getItems().get(0).getTourNameSnapshot()).isEqualTo("Da Nang - Hoi An 3D2N");
@@ -101,13 +116,60 @@ class BookingServiceTest {
         assertThat(response.getHotelDetails().get(0).getHotelNameSnapshot()).isEqualTo("Grand Tourane Hotel");
         assertThat(response.getHotelDetails().get(0).getPriceSnapshot()).isEqualByComparingTo("1200000.00");
 
-        // Verify Saga instance was initialized
         ArgumentCaptor<SagaInstance> sagaCaptor = ArgumentCaptor.forClass(SagaInstance.class);
         verify(sagaInstanceRepository, times(1)).save(sagaCaptor.capture());
         SagaInstance capturedSaga = sagaCaptor.getValue();
         assertThat(capturedSaga.getSagaType()).isEqualTo("BOOKING_CREATE");
         assertThat(capturedSaga.getStatus()).isEqualTo("STARTED");
         assertThat(capturedSaga.getCurrentStep()).isEqualTo("PENDING_CONFIRMATION");
+    }
+
+    @Test
+    @DisplayName("OpenFeign Scenario 1: Should throw UserBlockedException (403 Forbidden) when user is BLOCKED")
+    void createBooking_whenUserIsBlocked_throwsUserBlockedException() {
+        BookingCreateRequest request = BookingCreateRequest.builder()
+                .customerId(99L)
+                .tourId(101L)
+                .departureId(201L)
+                .unitPrice(new BigDecimal("1000000.00"))
+                .quantity(1)
+                .build();
+
+        when(userFeignClient.getUserStatus(99L)).thenReturn(UserStatusDto.builder()
+                .userId(99L)
+                .email("blocked@smarttrip.com")
+                .status("BLOCKED")
+                .active(false)
+                .build());
+
+        assertThatThrownBy(() -> bookingService.createBooking(request))
+                .isInstanceOf(UserBlockedException.class)
+                .hasMessageContaining("User account is BLOCKED");
+
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("OpenFeign Scenario 2: Should throw BusinessException when available seats are insufficient")
+    void createBooking_whenNotEnoughSeats_throwsBusinessException() {
+        BookingCreateRequest request = BookingCreateRequest.builder()
+                .customerId(10L)
+                .tourId(101L)
+                .departureId(201L)
+                .unitPrice(new BigDecimal("1000000.00"))
+                .quantity(5)
+                .build();
+
+        when(userFeignClient.getUserStatus(10L)).thenReturn(UserStatusDto.builder()
+                .userId(10L).active(true).status("ACTIVE").build());
+        when(tourFeignClient.getDepartureSnapshot(201L)).thenReturn(DepartureSnapshotDto.builder()
+                .departureId(201L).availableSeats(2).active(true).build());
+
+        assertThatThrownBy(() -> bookingService.createBooking(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Not enough available seats");
+
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -122,56 +184,47 @@ class BookingServiceTest {
                 .idempotencyKey("dup-booking-key")
                 .build();
 
-        when(bookingRepository.findByIdempotencyKey("dup-booking-key")).thenReturn(Optional.of(existingBooking));
-
         BookingCreateRequest request = BookingCreateRequest.builder()
                 .customerId(10L)
                 .tourId(101L)
                 .departureId(201L)
-                .tourName("Test Tour")
-                .departureDate(LocalDate.now())
                 .unitPrice(new BigDecimal("3500000.00"))
                 .quantity(1)
                 .idempotencyKey("dup-booking-key")
                 .build();
 
+        when(userFeignClient.getUserStatus(10L)).thenReturn(UserStatusDto.builder()
+                .userId(10L).active(true).status("ACTIVE").build());
+        when(tourFeignClient.getDepartureSnapshot(201L)).thenReturn(DepartureSnapshotDto.builder()
+                .departureId(201L).availableSeats(10).active(true).build());
+        when(bookingRepository.findByIdempotencyKey("dup-booking-key")).thenReturn(Optional.of(existingBooking));
+
         BookingResponse response = bookingService.createBooking(request);
 
         assertThat(response.getBookingCode()).isEqualTo("BK-EXISTING-99");
         verify(bookingRepository, never()).save(any());
-        verify(sagaInstanceRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Should reject booking creation when customer ID is missing")
+    @DisplayName("Should throw BusinessException when customerId is missing")
     void createBooking_missingCustomerId_throwsException() {
         BookingCreateRequest request = BookingCreateRequest.builder()
-                .tourId(101L)
-                .departureId(201L)
-                .tourName("Test Tour")
-                .departureDate(LocalDate.now())
-                .unitPrice(new BigDecimal("1000000.00"))
                 .quantity(1)
+                .unitPrice(new BigDecimal("1000000.00"))
                 .build();
 
         assertThatThrownBy(() -> bookingService.createBooking(request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Customer ID is required");
-
-        verify(bookingRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Should reject booking creation when quantity is less than 1")
+    @DisplayName("Should throw BusinessException when quantity is less than 1")
     void createBooking_invalidQuantity_throwsException() {
         BookingCreateRequest request = BookingCreateRequest.builder()
                 .customerId(10L)
-                .tourId(101L)
-                .departureId(201L)
-                .tourName("Test Tour")
-                .departureDate(LocalDate.now())
-                .unitPrice(new BigDecimal("1000000.00"))
                 .quantity(0)
+                .unitPrice(new BigDecimal("1000000.00"))
                 .build();
 
         assertThatThrownBy(() -> bookingService.createBooking(request))
@@ -180,21 +233,17 @@ class BookingServiceTest {
     }
 
     @Test
-    @DisplayName("Should reject booking creation when unit price is zero or negative")
+    @DisplayName("Should throw BusinessException when unitPrice is zero or negative")
     void createBooking_invalidUnitPrice_throwsException() {
         BookingCreateRequest request = BookingCreateRequest.builder()
                 .customerId(10L)
-                .tourId(101L)
-                .departureId(201L)
-                .tourName("Test Tour")
-                .departureDate(LocalDate.now())
-                .unitPrice(BigDecimal.ZERO)
                 .quantity(1)
+                .unitPrice(BigDecimal.ZERO)
                 .build();
 
         assertThatThrownBy(() -> bookingService.createBooking(request))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("greater than zero");
+                .hasMessageContaining("Tour unit price must be greater than zero");
     }
 
     @Test

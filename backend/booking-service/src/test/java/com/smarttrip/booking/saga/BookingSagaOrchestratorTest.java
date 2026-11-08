@@ -6,12 +6,12 @@ import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
 import com.smarttrip.booking.repository.SagaStepRepository;
 import com.smarttrip.booking.saga.impl.BookingSagaOrchestratorImpl;
+import com.smarttrip.messaging.command.ReleaseHotelCommand;
+import com.smarttrip.messaging.command.ReleaseTourCommand;
 import com.smarttrip.messaging.command.ReserveTourCommand;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
-import com.smarttrip.messaging.event.HotelReservedEvent;
-import com.smarttrip.messaging.event.PaymentAuthorizedEvent;
-import com.smarttrip.messaging.event.TourReservedEvent;
+import com.smarttrip.messaging.event.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -290,6 +290,231 @@ class BookingSagaOrchestratorTest {
         assertThat(mockSaga.getStatus()).isEqualTo("COMPLETED");
         assertThat(mockSaga.getCurrentStep()).isEqualTo("COMPLETED");
         assertThat(mockSaga.getCompletedAt()).isNotNull();
+
+        verify(bookingRepository, times(1)).save(mockBooking);
+        verify(sagaInstanceRepository, times(1)).save(mockSaga);
+    }
+
+    // ==========================================
+    // Compensation & Failure Scenarios (Issue #14)
+    // ==========================================
+
+    @Test
+    @DisplayName("Failure Scenario A: Tour no seats -> Fails booking, marks saga COMPENSATED, no compensation commands")
+    void handleTourReserveFailed_cancelsBooking_andMarksSagaCompensated() {
+        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
+
+        stepsMap.put("saga-uuid-1:RESERVE_TOUR", SagaStep.builder()
+                .sagaInstance(mockSaga)
+                .stepName("RESERVE_TOUR")
+                .status("PENDING")
+                .build());
+
+        TourReserveFailedEvent event = TourReserveFailedEvent.builder()
+                .bookingId(1L)
+                .bookingCode("BK-20261201-1234")
+                .tourId(100L)
+                .departureId(200L)
+                .reason("Not enough available seats")
+                .build();
+
+        sagaOrchestrator.handleTourReserveFailed(MessageEnvelope.of("TOUR_RESERVE_FAILED_EVENT", event, "saga-uuid-1"));
+
+        // Verify step status and reason
+        SagaStep tourStep = stepsMap.get("saga-uuid-1:RESERVE_TOUR");
+        assertThat(tourStep.getStatus()).isEqualTo("FAILED");
+        assertThat(tourStep.getLastError()).isEqualTo("Not enough available seats");
+
+        // Verify booking marked FAILED
+        assertThat(mockBooking.getStatus()).isEqualTo("FAILED");
+        verify(bookingRepository, times(1)).save(mockBooking);
+
+        // Verify saga marked COMPENSATED
+        assertThat(mockSaga.getStatus()).isEqualTo("COMPENSATED");
+        assertThat(mockSaga.getCurrentStep()).isEqualTo("FAILED");
+        assertThat(mockSaga.getFailureReason()).isEqualTo("Not enough available seats");
+        assertThat(mockSaga.getCompletedAt()).isNotNull();
+        verify(sagaInstanceRepository, times(1)).save(mockSaga);
+
+        // Verify no compensation commands sent (no resources reserved)
+        verifyNoInteractions(outboxPublisher);
+    }
+
+    @Test
+    @DisplayName("Failure Scenario B: Hotel no rooms -> Compensates tour seats, fails booking, marks saga COMPENSATED")
+    void handleHotelReserveFailed_compensatesTour_andMarksSagaCompensated() {
+        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
+
+        stepsMap.put("saga-uuid-1:RESERVE_HOTEL", SagaStep.builder()
+                .sagaInstance(mockSaga)
+                .stepName("RESERVE_HOTEL")
+                .status("PENDING")
+                .build());
+
+        HotelReserveFailedEvent event = HotelReserveFailedEvent.builder()
+                .bookingId(1L)
+                .bookingCode("BK-20261201-1234")
+                .hotelId(50L)
+                .roomTypeId(60L)
+                .reason("Not enough available rooms for all dates")
+                .build();
+
+        sagaOrchestrator.handleHotelReserveFailed(MessageEnvelope.of("HOTEL_RESERVE_FAILED_EVENT", event, "saga-uuid-1"));
+
+        // Verify steps
+        assertThat(stepsMap.get("saga-uuid-1:RESERVE_HOTEL").getStatus()).isEqualTo("FAILED");
+        assertThat(stepsMap.get("saga-uuid-1:RESERVE_HOTEL").getLastError()).isEqualTo("Not enough available rooms for all dates");
+        assertThat(stepsMap.get("saga-uuid-1:COMPENSATE_TOUR").getStatus()).isEqualTo("COMPLETED");
+
+        // Verify ReleaseTourCommand sent via Outbox
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_TOUR_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR),
+                captor.capture()
+        );
+
+        MessageEnvelope envelope = (MessageEnvelope) captor.getValue();
+        assertThat(envelope.getMessageType()).isEqualTo("RELEASE_TOUR_COMMAND");
+        ReleaseTourCommand cmd = (ReleaseTourCommand) envelope.getPayload();
+        assertThat(cmd.getBookingId()).isEqualTo(1L);
+        assertThat(cmd.getTourId()).isEqualTo(100L);
+        assertThat(cmd.getDepartureId()).isEqualTo(200L);
+        assertThat(cmd.getQuantity()).isEqualTo(2);
+
+        // Verify booking marked FAILED & saga COMPENSATED
+        assertThat(mockBooking.getStatus()).isEqualTo("FAILED");
+        assertThat(mockSaga.getStatus()).isEqualTo("COMPENSATED");
+        assertThat(mockSaga.getCurrentStep()).isEqualTo("COMPENSATED");
+        assertThat(mockSaga.getFailureReason()).isEqualTo("Not enough available rooms for all dates");
+        assertThat(mockSaga.getCompletedAt()).isNotNull();
+
+        verify(bookingRepository, times(1)).save(mockBooking);
+        verify(sagaInstanceRepository, times(1)).save(mockSaga);
+    }
+
+    @Test
+    @DisplayName("Failure Scenario C1 (No Hotel): Payment auth failed -> Compensates tour seats, fails booking, marks saga COMPENSATED")
+    void handlePaymentAuthorizeFailed_withoutHotel_compensatesTour() {
+        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
+
+        stepsMap.put("saga-uuid-1:AUTHORIZE_PAYMENT", SagaStep.builder()
+                .sagaInstance(mockSaga)
+                .stepName("AUTHORIZE_PAYMENT")
+                .status("PENDING")
+                .build());
+
+        PaymentAuthorizeFailedEvent event = PaymentAuthorizeFailedEvent.builder()
+                .bookingId(1L)
+                .bookingCode("BK-20261201-1234")
+                .reason("Insufficient wallet balance. Available: 1000000.00, Required: 5000000.00")
+                .build();
+
+        sagaOrchestrator.handlePaymentAuthorizeFailed(MessageEnvelope.of("PAYMENT_AUTHORIZE_FAILED_EVENT", event, "saga-uuid-1"));
+
+        // Verify steps
+        assertThat(stepsMap.get("saga-uuid-1:AUTHORIZE_PAYMENT").getStatus()).isEqualTo("FAILED");
+        assertThat(stepsMap.get("saga-uuid-1:COMPENSATE_TOUR").getStatus()).isEqualTo("COMPLETED");
+
+        // Verify ReleaseTourCommand sent
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_TOUR_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR),
+                any()
+        );
+
+        // Verify NO ReleaseHotelCommand sent (no hotel in booking)
+        verify(outboxPublisher, never()).enqueueAndPublish(
+                any(), any(), eq("RELEASE_HOTEL_COMMAND"), any(), any(), any()
+        );
+
+        // Verify booking & saga status
+        assertThat(mockBooking.getStatus()).isEqualTo("FAILED");
+        assertThat(mockSaga.getStatus()).isEqualTo("COMPENSATED");
+        assertThat(mockSaga.getCurrentStep()).isEqualTo("COMPENSATED");
+        assertThat(mockSaga.getFailureReason()).contains("Insufficient wallet balance");
+        assertThat(mockSaga.getCompletedAt()).isNotNull();
+
+        verify(bookingRepository, times(1)).save(mockBooking);
+        verify(sagaInstanceRepository, times(1)).save(mockSaga);
+    }
+
+    @Test
+    @DisplayName("Failure Scenario C2 (With Hotel): Payment auth failed -> Compensates BOTH tour and hotel, fails booking, marks saga COMPENSATED")
+    void handlePaymentAuthorizeFailed_withHotel_compensatesBothTourAndHotel() {
+        mockBooking.getHotelDetails().add(BookingHotelDetail.builder()
+                .hotelId(50L)
+                .roomTypeId(60L)
+                .checkInDate(LocalDate.now().plusDays(10))
+                .checkOutDate(LocalDate.now().plusDays(12))
+                .roomQuantity(1)
+                .priceSnapshot(new BigDecimal("1000000.00"))
+                .build());
+
+        when(sagaInstanceRepository.findBySagaId("saga-uuid-1")).thenReturn(Optional.of(mockSaga));
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(mockBooking));
+
+        stepsMap.put("saga-uuid-1:AUTHORIZE_PAYMENT", SagaStep.builder()
+                .sagaInstance(mockSaga)
+                .stepName("AUTHORIZE_PAYMENT")
+                .status("PENDING")
+                .build());
+
+        PaymentAuthorizeFailedEvent event = PaymentAuthorizeFailedEvent.builder()
+                .bookingId(1L)
+                .bookingCode("BK-20261201-1234")
+                .reason("Insufficient wallet balance")
+                .build();
+
+        sagaOrchestrator.handlePaymentAuthorizeFailed(MessageEnvelope.of("PAYMENT_AUTHORIZE_FAILED_EVENT", event, "saga-uuid-1"));
+
+        // Verify steps
+        assertThat(stepsMap.get("saga-uuid-1:AUTHORIZE_PAYMENT").getStatus()).isEqualTo("FAILED");
+        assertThat(stepsMap.get("saga-uuid-1:COMPENSATE_TOUR").getStatus()).isEqualTo("COMPLETED");
+        assertThat(stepsMap.get("saga-uuid-1:COMPENSATE_HOTEL").getStatus()).isEqualTo("COMPLETED");
+
+        // Verify ReleaseTourCommand sent
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_TOUR_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_TOUR),
+                any()
+        );
+
+        // Verify ReleaseHotelCommand sent
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxPublisher, times(1)).enqueueAndPublish(
+                eq("BOOKING"),
+                eq("1"),
+                eq("RELEASE_HOTEL_COMMAND"),
+                eq(RabbitMQConstants.EXCHANGE_COMMANDS),
+                eq(RabbitMQConstants.ROUTING_KEY_RELEASE_HOTEL),
+                captor.capture()
+        );
+
+        MessageEnvelope envelope = (MessageEnvelope) captor.getValue();
+        assertThat(envelope.getMessageType()).isEqualTo("RELEASE_HOTEL_COMMAND");
+        ReleaseHotelCommand hotelCmd = (ReleaseHotelCommand) envelope.getPayload();
+        assertThat(hotelCmd.getBookingId()).isEqualTo(1L);
+        assertThat(hotelCmd.getHotelId()).isEqualTo(50L);
+        assertThat(hotelCmd.getRoomTypeId()).isEqualTo(60L);
+        assertThat(hotelCmd.getRoomQuantity()).isEqualTo(1);
+
+        // Verify booking & saga status
+        assertThat(mockBooking.getStatus()).isEqualTo("FAILED");
+        assertThat(mockSaga.getStatus()).isEqualTo("COMPENSATED");
+        assertThat(mockSaga.getCurrentStep()).isEqualTo("COMPENSATED");
 
         verify(bookingRepository, times(1)).save(mockBooking);
         verify(sagaInstanceRepository, times(1)).save(mockSaga);

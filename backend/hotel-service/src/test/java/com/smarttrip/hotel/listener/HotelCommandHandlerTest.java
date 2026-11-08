@@ -7,6 +7,8 @@ import com.smarttrip.hotel.entity.RoomType;
 import com.smarttrip.hotel.idempotency.IdempotentConsumerService;
 import com.smarttrip.hotel.outbox.OutboxPublisher;
 import com.smarttrip.hotel.repository.RoomInventoryRepository;
+import com.smarttrip.messaging.command.ConfirmHotelCommand;
+import com.smarttrip.messaging.command.ReleaseHotelCommand;
 import com.smarttrip.messaging.command.ReserveHotelCommand;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
@@ -154,5 +156,47 @@ class HotelCommandHandlerTest {
         assertThat(inv.getAvailableRooms()).isEqualTo(4);
         verify(roomInventoryRepository, times(1)).save(inv);
         verify(outboxPublisher, times(1)).enqueueAndPublish(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Compensation: Should process ReleaseHotelCommand and restore room inventory")
+    void handleReleaseHotel_success() {
+        when(idempotentConsumerService.markProcessedIfNew("msg-release-hotel", "HotelCommandHandler")).thenReturn(true);
+
+        RoomType roomType = RoomType.builder().id(20L).basePrice(new BigDecimal("1000000.00")).build();
+        RoomInventory inv = RoomInventory.builder()
+                .id(101L)
+                .roomType(roomType)
+                .availableRooms(3)
+                .inventoryDate(LocalDate.now().plusDays(2))
+                .build();
+
+        LocalDate checkIn = LocalDate.now().plusDays(2);
+        LocalDate checkOut = LocalDate.now().plusDays(3);
+
+        when(roomInventoryRepository.findByRoomTypeIdAndInventoryDateBetween(20L, checkIn, checkIn))
+                .thenReturn(List.of(inv));
+
+        ReleaseHotelCommand cmd = ReleaseHotelCommand.builder()
+                .bookingId(1L)
+                .bookingCode("BK-HOTEL-1")
+                .hotelId(10L)
+                .roomTypeId(20L)
+                .checkInDate(checkIn)
+                .checkOutDate(checkOut)
+                .roomQuantity(2)
+                .build();
+
+        MessageEnvelope<Object> envelope = MessageEnvelope.<Object>builder()
+                .messageId("msg-release-hotel")
+                .messageType("RELEASE_HOTEL_COMMAND")
+                .payload(cmd)
+                .build();
+
+        hotelCommandHandler.onHotelCommand(envelope);
+
+        // Room count restored from 3 to 5 (3 + 2 = 5)
+        assertThat(inv.getAvailableRooms()).isEqualTo(5);
+        verify(roomInventoryRepository, times(1)).save(inv);
     }
 }

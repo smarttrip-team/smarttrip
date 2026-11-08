@@ -3,6 +3,7 @@ package com.smarttrip.payment.listener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttrip.messaging.command.AuthorizePaymentCommand;
 import com.smarttrip.messaging.command.CapturePaymentCommand;
+import com.smarttrip.messaging.command.VoidPaymentCommand;
 import com.smarttrip.messaging.constant.RabbitMQConstants;
 import com.smarttrip.messaging.envelope.MessageEnvelope;
 import com.smarttrip.messaging.event.PaymentAuthorizedEvent;
@@ -153,5 +154,28 @@ class PaymentCommandHandlerTest {
         paymentCommandHandler.onPaymentCommand(envelope);
 
         verify(paymentService, times(1)).capture(10L, "BK-PAY-1", new BigDecimal("3000000.00"));
+    }
+
+    @Test
+    @DisplayName("Compensation: Should process VoidPaymentCommand and release held amount")
+    void handleVoid_success() {
+        when(idempotentConsumerService.markProcessedIfNew("msg-void-1", "PaymentCommandHandler")).thenReturn(true);
+
+        VoidPaymentCommand cmd = VoidPaymentCommand.builder()
+                .bookingId(1L)
+                .bookingCode("BK-PAY-1")
+                .userId(10L)
+                .amount(new BigDecimal("3000000.00"))
+                .build();
+
+        MessageEnvelope<Object> envelope = MessageEnvelope.<Object>builder()
+                .messageId("msg-void-1")
+                .messageType("VOID_PAYMENT_COMMAND")
+                .payload(cmd)
+                .build();
+
+        paymentCommandHandler.onPaymentCommand(envelope);
+
+        verify(paymentService, times(1)).voidAuthorization(10L, "BK-PAY-1");
     }
 }

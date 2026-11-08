@@ -14,22 +14,22 @@ spring:
         - id: user-service-route
           uri: lb://user-service
           predicates:
-            - Path=/api/v1/auth/**, /api/v1/users/**
+            - Path=/api/v1/auth/**, /api/v1/users/**, /internal/v1/users/**
 
         - id: tour-service-route
           uri: lb://tour-service
           predicates:
-            - Path=/api/v1/tours/**, /api/v1/operator/tours/**
+            - Path=/api/v1/tours/**, /api/v1/operator/**, /internal/v1/departures/**
 
         - id: hotel-service-route
           uri: lb://hotel-service
           predicates:
-            - Path=/api/v1/hotels/**, /api/v1/manager/hotels/**
+            - Path=/api/v1/hotels/**, /api/v1/manager/**
 
         - id: payment-service-route
           uri: lb://payment-service
           predicates:
-            - Path=/api/v1/wallet/**, /api/v1/payments/**
+            - Path=/api/v1/wallet/**, /api/v1/wallets/**, /api/v1/payments/**
 
         - id: booking-service-route
           uri: lb://booking-service
@@ -39,11 +39,15 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
   instance:
     prefer-ip-address: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
 
 management:
   endpoints:

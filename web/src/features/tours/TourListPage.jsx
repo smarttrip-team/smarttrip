@@ -99,13 +99,13 @@ export const TourListPage = () => {
   const [tours, setTours] = useState(SEED_TOURS);
   const [loading, setLoading] = useState(false);
 
-  // Search & Filter State (Issue #17)
+  // Search & Filter State
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('ALL');
   const [priceFilter, setPriceFilter] = useState('ALL'); // 'ALL' | 'UNDER_4M' | '4M_TO_5M' | 'OVER_5M'
   const [sortBy, setSortBy] = useState('DEFAULT'); // 'DEFAULT' | 'PRICE_ASC' | 'PRICE_DESC' | 'RATING_DESC'
 
-  // Tour Detail Modal State (Issue #17)
+  // Tour Detail Modal State
   const [selectedTour, setSelectedTour] = useState(null);
   const [selectedDeparture, setSelectedDeparture] = useState(null);
   const [includeHotel, setIncludeHotel] = useState(true);
@@ -273,7 +273,7 @@ export const TourListPage = () => {
 
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Filter Controls Bar (Issue #17 & Smart Dropdown) */}
+        {/* Filter Controls Bar & Smart Dropdown */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             {/* Left: Dropdown Selectors Toolbar */}
@@ -512,7 +512,7 @@ export const TourListPage = () => {
         )}
       </div>
 
-      {/* Tour Detail Modal (Issue #17) */}
+      {/* Tour Detail Modal */}
       {selectedTour && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-8">

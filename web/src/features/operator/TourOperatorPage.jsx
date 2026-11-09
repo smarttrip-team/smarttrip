@@ -38,7 +38,7 @@ export default function TourOperatorPage() {
   const [editingDepartureId, setEditingDepartureId] = useState(null);
   const [capacityEditForm, setCapacityEditForm] = useState({ totalSeats: 20, availableSeats: 20 });
 
-  // Operator Emergency Booking Cancellation State (Issue #41)
+  // Operator Emergency Booking Cancellation State
   const [lookupBookingCode, setLookupBookingCode] = useState('');
   const [cancellingCode, setCancellingCode] = useState(false);
 
@@ -188,7 +188,7 @@ export default function TourOperatorPage() {
             <div>
               <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs tracking-wider uppercase">
                 <Layers className="w-4 h-4" />
-                <span>Tour Operator Portal • Issue #7 & #41</span>
+                <span>Tour Operator Management Portal</span>
               </div>
               <h1 className="text-2xl font-bold text-slate-900 mt-1">
                 Quản lý Tour & Lịch trình Khởi hành
@@ -221,7 +221,7 @@ export default function TourOperatorPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Operator Emergency Cancellation & Refund Tool (Issue #41) */}
+        {/* Operator Emergency Cancellation & Refund Tool */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">

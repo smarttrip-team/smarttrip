@@ -112,7 +112,7 @@ export const BookingHistoryPage = () => {
                 <ShieldCheck className="w-3 h-3" />
                 SAGA CANCELLATION & REFUND
               </span>
-              <span className="text-xs text-slate-300 font-semibold">Chính sách hủy tour & hoàn tiền tự động (Issue #16)</span>
+              <span className="text-xs text-slate-300 font-semibold">Chính sách hủy tour & hoàn tiền tự động</span>
             </div>
             <p className="text-xs text-slate-300">
               Khi khách hàng nhấn "Hủy tour", Saga Orchestrator sẽ tự động điều phối trả ghế tour, hoàn phòng khách sạn và hoàn tiền tức thì vào Ví SmartTrip.

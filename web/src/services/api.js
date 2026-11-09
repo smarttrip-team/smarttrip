@@ -29,10 +29,23 @@ API.interceptors.response.use(
   }
 );
 
+export const authApi = {
+  login: (credentials) => API.post('/api/v1/auth/login', credentials),
+  register: (payload) => API.post('/api/v1/auth/register', payload),
+  getProfile: () => API.get('/api/v1/users/me'),
+  updateProfile: (payload) => API.put('/api/v1/users/me', payload),
+  getUserById: (id) => API.get(`/api/v1/users/${id}`),
+};
+
 export const tourApi = {
-  getTours: () => API.get('/api/v1/tours'),
+  getTours: (params) => API.get('/api/v1/tours', { params }),
   getTourById: (id) => API.get(`/api/v1/tours/${id}`),
   getTourDepartures: (id) => API.get(`/api/v1/tours/${id}/departures`),
+};
+
+export const operatorApi = {
+  createTour: (payload) => API.post('/api/v1/operator/tours', payload),
+  addDeparture: (tourId, payload) => API.post(`/api/v1/operator/tours/${tourId}/departures`, payload),
 };
 
 export const hotelApi = {

@@ -1,15 +1,32 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { walletApi } from '../services/api';
+import { walletApi, authApi } from '../services/api';
 
 const AuthWalletContext = createContext(null);
 
 export const AuthWalletProvider = ({ children }) => {
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem('smarttrip_token') || null;
+  });
+
   const [currentUserId, setCurrentUserId] = useState(() => {
     return Number(localStorage.getItem('smarttrip_user_id')) || 10;
   });
 
   const [currentUserName, setCurrentUserName] = useState(() => {
     return localStorage.getItem('smarttrip_user_name') || 'Lê Quang Vĩnh';
+  });
+
+  const [currentUserEmail, setCurrentUserEmail] = useState(() => {
+    return localStorage.getItem('smarttrip_user_email') || 'vinh@smarttrip.vn';
+  });
+
+  const [roles, setRoles] = useState(() => {
+    try {
+      const stored = localStorage.getItem('smarttrip_roles');
+      return stored ? JSON.parse(stored) : ['ROLE_CUSTOMER'];
+    } catch {
+      return ['ROLE_CUSTOMER'];
+    }
   });
 
   const [wallet, setWallet] = useState({
@@ -26,7 +43,7 @@ export const AuthWalletProvider = ({ children }) => {
     setToast({ id: Date.now(), message, type });
     setTimeout(() => {
       setToast((prev) => (prev?.message === message ? null : prev));
-    }, 4000);
+    }, 4500);
   }, []);
 
   const refreshWallet = useCallback(async (userId = currentUserId) => {
@@ -51,23 +68,112 @@ export const AuthWalletProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('smarttrip_user_id', String(currentUserId));
     localStorage.setItem('smarttrip_user_name', currentUserName);
+    localStorage.setItem('smarttrip_user_email', currentUserEmail);
+    localStorage.setItem('smarttrip_roles', JSON.stringify(roles));
+    if (token) {
+      localStorage.setItem('smarttrip_token', token);
+    }
     refreshWallet(currentUserId);
-  }, [currentUserId, currentUserName, refreshWallet]);
+  }, [currentUserId, currentUserName, currentUserEmail, roles, token, refreshWallet]);
 
-  const switchUser = (newId, newName) => {
+  // Login handler
+  const login = async (email, password) => {
+    try {
+      const res = await authApi.login({ email, password });
+      const data = res.data;
+      if (data && data.token) {
+        setToken(data.token);
+        setCurrentUserId(data.id);
+        setCurrentUserName(data.fullName || data.email);
+        setCurrentUserEmail(data.email);
+        const userRoles = Array.from(data.roles || ['ROLE_CUSTOMER']);
+        setRoles(userRoles);
+
+        localStorage.setItem('smarttrip_token', data.token);
+        localStorage.setItem('smarttrip_user_id', String(data.id));
+        localStorage.setItem('smarttrip_user_name', data.fullName || data.email);
+        localStorage.setItem('smarttrip_user_email', data.email);
+        localStorage.setItem('smarttrip_roles', JSON.stringify(userRoles));
+
+        showToast(`Đăng nhập thành công! Chào mừng ${data.fullName || data.email}`, 'success');
+        refreshWallet(data.id);
+        return { success: true, data };
+      }
+      throw new Error('Dữ liệu xác thực không hợp lệ');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Đăng nhập thất bại';
+      showToast(msg, 'error');
+      throw new Error(msg);
+    }
+  };
+
+  // Register handler
+  const register = async (registerData) => {
+    try {
+      const res = await authApi.register(registerData);
+      const data = res.data;
+      if (data && data.token) {
+        setToken(data.token);
+        setCurrentUserId(data.id);
+        setCurrentUserName(data.fullName || data.email);
+        setCurrentUserEmail(data.email);
+        const userRoles = Array.from(data.roles || ['ROLE_CUSTOMER']);
+        setRoles(userRoles);
+
+        localStorage.setItem('smarttrip_token', data.token);
+        localStorage.setItem('smarttrip_user_id', String(data.id));
+        localStorage.setItem('smarttrip_user_name', data.fullName || data.email);
+        localStorage.setItem('smarttrip_user_email', data.email);
+        localStorage.setItem('smarttrip_roles', JSON.stringify(userRoles));
+
+        showToast(`Đăng ký tài khoản thành công! Chào mừng ${data.fullName || data.email}`, 'success');
+        refreshWallet(data.id);
+        return { success: true, data };
+      }
+      return { success: true };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Đăng ký thất bại';
+      showToast(msg, 'error');
+      throw new Error(msg);
+    }
+  };
+
+  // Logout handler
+  const logout = () => {
+    setToken(null);
+    localStorage.removeItem('smarttrip_token');
+    showToast('Đã đăng xuất khỏi tài khoản', 'info');
+  };
+
+  // Demo user switcher
+  const switchUser = (newId, newName, newRoles = ['ROLE_CUSTOMER']) => {
     setCurrentUserId(newId);
     if (newName) setCurrentUserName(newName);
+    setRoles(newRoles);
     showToast(`Đã chuyển sang tài khoản ID: ${newId} (${newName || 'User ' + newId})`, 'info');
   };
+
+  const isOperator = roles.includes('ROLE_TOUR_OPERATOR') || roles.includes('ROLE_ADMIN');
+  const isAdmin = roles.includes('ROLE_ADMIN');
+  const isAuthenticated = Boolean(token);
 
   return (
     <AuthWalletContext.Provider
       value={{
+        token,
         currentUserId,
         currentUserName,
+        currentUserEmail,
+        roles,
+        isOperator,
+        isAdmin,
+        isAuthenticated,
         wallet,
         loadingWallet,
         refreshWallet,
+        login,
+        register,
+        logout,
         switchUser,
         showToast,
       }}

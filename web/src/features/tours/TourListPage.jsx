@@ -80,18 +80,21 @@ export const TourListPage = () => {
       setLoading(true);
       try {
         const res = await tourApi.getTours();
-        if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+        const items = Array.isArray(res?.data) ? res.data : (res?.data?.content || []);
+        if (items.length > 0) {
           // Merge API tours with sample departures if missing
-          const mapped = res.data.map((t, idx) => ({
+          const mapped = items.map((t, idx) => ({
             id: t.id,
             name: t.name || t.title,
             description: t.description || 'Khám phá hành trình du lịch độc đáo cùng SmartTrip.',
-            destination: t.destination || t.location || 'Việt Nam',
-            duration: t.duration || '3N2Đ',
+            destination: t.destination || t.destinationName || t.city || 'Việt Nam',
+            duration: t.duration || (t.durationDays ? `${t.durationDays} Ngày` : '3N2Đ'),
             basePrice: t.basePrice || t.price || 3500000,
             imageUrl: t.imageUrl || SEED_TOURS[idx % SEED_TOURS.length].imageUrl,
             rating: 4.9,
-            departures: t.departures || SEED_TOURS[idx % SEED_TOURS.length].departures,
+            departures: (t.upcomingDepartures && t.upcomingDepartures.length > 0)
+              ? t.upcomingDepartures
+              : (t.departures || SEED_TOURS[idx % SEED_TOURS.length].departures),
             hotelOption: SEED_TOURS[idx % SEED_TOURS.length].hotelOption,
           }));
           setTours(mapped);

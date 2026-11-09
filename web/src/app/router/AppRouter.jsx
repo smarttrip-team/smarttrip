@@ -7,6 +7,7 @@ import { CheckoutPage } from '../../features/booking/CheckoutPage';
 import { BookingTrackingPage } from '../../features/booking/BookingTrackingPage';
 import { BookingHistoryPage } from '../../features/booking/BookingHistoryPage';
 import { WalletPage } from '../../features/wallet/WalletPage';
+import { TourOperatorPage } from '../../features/operator/TourOperatorPage';
 
 export const AppRouter = () => {
   return (
@@ -20,6 +21,7 @@ export const AppRouter = () => {
             <Route path="/tracking/:bookingCode" element={<BookingTrackingPage />} />
             <Route path="/bookings" element={<BookingHistoryPage />} />
             <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/operator" element={<TourOperatorPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

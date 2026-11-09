@@ -1,252 +1,311 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Compass, Wallet, History, CreditCard, ChevronDown, User, Sparkles, 
-  Briefcase, LogIn, LogOut, ShieldCheck, UserCheck 
+import { useAuthWallet, PRESET_USERS } from '../../context/AuthWalletContext';
+import {
+  Compass,
+  Wallet,
+  CalendarCheck,
+  UserCheck,
+  ChevronDown,
+  Layers,
+  Activity,
+  Users,
+  Building2,
+  CalendarRange,
+  PlusCircle,
+  ShieldCheck,
+  Sparkles,
+  LogIn,
+  LogOut,
+  Briefcase,
+  History,
 } from 'lucide-react';
-import { useAuthWallet } from '../../context/AuthWalletContext';
 import { AuthModal } from '../../features/auth/AuthModal';
 import { UserProfileModal } from '../../features/auth/UserProfileModal';
 
-export const Navbar = () => {
-  const location = useLocation();
+export default function Navbar() {
   const { 
-    token, 
+    token,
     currentUserId, 
     currentUserName, 
-    currentUserEmail, 
-    roles, 
-    isOperator, 
-    isAdmin, 
-    isAuthenticated, 
+    currentUserEmail,
+    currentRole, 
+    roles,
     wallet, 
-    switchUser, 
-    logout 
+    loadingWallet, 
+    switchUser,
+    logout,
+    isAuthenticated,
   } = useAuthWallet();
 
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalTab, setAuthModalTab] = useState('login');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const location = useLocation();
 
-  const formatVND = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0,
+    }).format(val || 0);
   };
 
-  const navLinks = [
-    { to: '/', label: 'Khám phá Tour', icon: Compass },
-    { to: '/wallet', label: 'Ví điện tử', icon: Wallet },
-    { to: '/bookings', label: 'Lịch sử đặt tour', icon: History },
-    { to: '/operator', label: 'Quản trị Tour', icon: Briefcase },
-  ];
+  const getRoleBadge = (role) => {
+    switch (role) {
+      case 'ROLE_ADMIN':
+        return { label: 'Admin', color: 'bg-rose-100 text-rose-700 border-rose-200' };
+      case 'ROLE_TOUR_OPERATOR':
+        return { label: 'Tour Operator', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+      case 'ROLE_HOTEL_MANAGER':
+        return { label: 'Hotel Manager', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+      default:
+        return { label: 'Customer', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' };
+    }
+  };
 
-  const presetUsers = [
-    { id: 1, name: 'Nguyễn Hồng Thái', email: 'thai@smarttrip.vn', roles: ['ROLE_CUSTOMER', 'ROLE_TOUR_OPERATOR'] },
-    { id: 10, name: 'Lê Quang Vĩnh', email: 'vinh@smarttrip.vn', roles: ['ROLE_CUSTOMER'] },
-    { id: 2, name: 'Tour Operator Demo', email: 'operator@smarttrip.vn', roles: ['ROLE_TOUR_OPERATOR'] },
-    { id: 99, name: 'Hệ Thống Admin', email: 'admin@smarttrip.vn', roles: ['ROLE_ADMIN'] },
-  ];
+  const roleBadge = getRoleBadge(currentRole);
 
-  const getRoleBadge = () => {
-    if (isAdmin) return <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded font-semibold">Admin</span>;
-    if (isOperator) return <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-semibold">Operator</span>;
-    return <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-semibold">Customer</span>;
+  const isActive = (path) => {
+    return location.pathname === path
+      ? 'text-indigo-600 font-semibold border-b-2 border-indigo-600'
+      : 'text-slate-600 hover:text-indigo-600 transition-colors';
   };
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-indigo-100 group-hover:scale-105 transition-transform">
-                <Compass className="w-6 h-6 animate-spin-slow" />
-              </div>
-              <div>
-                <span className="text-xl font-bold bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-500 bg-clip-text text-transparent">
-                  SmartTrip
-                </span>
-                <span className="block text-[10px] uppercase tracking-wider font-semibold text-slate-400 -mt-1">
-                  Travel & Saga Booking
-                </span>
-              </div>
-            </Link>
+          <div className="flex items-center justify-between h-16">
+            {/* Left: Logo & Dynamic Menus */}
+            <div className="flex items-center gap-8">
+              <Link to="/" className="flex items-center gap-2.5 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
+                  <Compass className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                    SmartTrip
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium -mt-1">
+                    Microservices Platform
+                  </span>
+                </div>
+              </Link>
 
-            {/* Navigation Links */}
-            <nav className="hidden md:flex items-center gap-1">
-              {navLinks.map((link) => {
-                const Icon = link.icon;
-                const isActive = location.pathname === link.to;
-                return (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    {link.label}
-                    {link.to === '/operator' && (
-                      <span className="text-[9px] uppercase px-1 py-0.2 rounded bg-indigo-100 text-indigo-700 font-bold ml-0.5">
-                        Portal
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
+              {/* Dynamic Role-Based Navigation Menu */}
+              <nav className="hidden md:flex items-center gap-6 text-sm">
+                {/* Customer Menus */}
+                {currentRole === 'ROLE_CUSTOMER' && (
+                  <>
+                    <Link to="/tours" className={`py-5 ${isActive('/tours') || isActive('/')}`}>
+                      Khám phá Tour
+                    </Link>
+                    <Link to="/bookings" className={`py-5 flex items-center gap-1.5 ${isActive('/bookings')}`}>
+                      <CalendarCheck className="w-4 h-4" />
+                      Đơn đặt chỗ
+                    </Link>
+                    <Link to="/wallet" className={`py-5 flex items-center gap-1.5 ${isActive('/wallet')}`}>
+                      <Wallet className="w-4 h-4" />
+                      Ví SmartTrip
+                    </Link>
+                    <Link to="/operator" className={`py-5 flex items-center gap-1.5 ${isActive('/operator')}`}>
+                      <Briefcase className="w-4 h-4 text-slate-400" />
+                      Cổng Đối Tác
+                    </Link>
+                  </>
+                )}
 
-            {/* Right Section: Wallet Balance & User / Auth Controls */}
+                {/* Tour Operator Menus */}
+                {currentRole === 'ROLE_TOUR_OPERATOR' && (
+                  <>
+                    <Link to="/operator" className={`py-5 flex items-center gap-1.5 ${isActive('/operator')}`}>
+                      <Layers className="w-4 h-4 text-amber-500" />
+                      Quản lý Tour & Lịch trình
+                    </Link>
+                    <Link to="/tours" className={`py-5 ${isActive('/tours')}`}>
+                      Xem Catalog Tour
+                    </Link>
+                    <Link to="/bookings" className={`py-5 flex items-center gap-1.5 ${isActive('/bookings')}`}>
+                      <History className="w-4 h-4 text-slate-400" />
+                      Lịch sử đặt chỗ
+                    </Link>
+                  </>
+                )}
+
+                {/* Hotel Manager Menus */}
+                {currentRole === 'ROLE_HOTEL_MANAGER' && (
+                  <>
+                    <Link to="/hotel-manager" className={`py-5 flex items-center gap-1.5 ${isActive('/hotel-manager')}`}>
+                      <Building2 className="w-4 h-4 text-emerald-500" />
+                      Quản lý Khách sạn & Số lượng phòng
+                    </Link>
+                  </>
+                )}
+
+                {/* Admin Menus */}
+                {currentRole === 'ROLE_ADMIN' && (
+                  <>
+                    <Link to="/admin/sagas" className={`py-5 flex items-center gap-1.5 ${isActive('/admin/sagas')}`}>
+                      <Activity className="w-4 h-4 text-rose-500 animate-pulse" />
+                      <span className="font-semibold text-rose-600">Saga Visualizer</span>
+                    </Link>
+                    <Link to="/admin/users" className={`py-5 flex items-center gap-1.5 ${isActive('/admin/users')}`}>
+                      <Users className="w-4 h-4 text-indigo-500" />
+                      Quản lý Người dùng
+                    </Link>
+                    <Link to="/operator" className={`py-5 flex items-center gap-1.5 ${isActive('/operator')}`}>
+                      <Layers className="w-4 h-4 text-amber-500" />
+                      Cổng Tour Operator
+                    </Link>
+                    <Link to="/admin" className={`py-5 flex items-center gap-1.5 ${isActive('/admin')}`}>
+                      <ShieldCheck className="w-4 h-4 text-slate-500" />
+                      Tổng quan Hệ thống
+                    </Link>
+                  </>
+                )}
+              </nav>
+            </div>
+
+            {/* Right Header: Wallet Pill, Auth & Role Switcher */}
             <div className="flex items-center gap-3">
-              {/* Wallet Quick Pill */}
+              {/* Live Wallet Balance Pill */}
               <Link
                 to="/wallet"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/60 transition-colors group"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 transition-colors shadow-xs"
+                title="Số dư ví khả dụng"
               >
-                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs">
-                  <Wallet className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-left text-xs">
-                  <span className="text-slate-500 block text-[10px] leading-tight">Số dư ví</span>
-                  <span className="font-bold text-indigo-700">{formatVND(wallet.balance)}</span>
-                </div>
-                <span className="hidden sm:inline-block text-[10px] font-semibold text-indigo-600 bg-white px-1.5 py-0.5 rounded-full border border-indigo-200">
-                  Nạp +
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Wallet className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="text-slate-500 hidden sm:inline">Ví:</span>
+                <span className="font-semibold text-slate-900">
+                  {loadingWallet ? '...' : formatCurrency(wallet.balance)}
                 </span>
               </Link>
 
+              {/* Role Badge Indicator */}
+              <span className={`hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${roleBadge.color}`}>
+                {roleBadge.label}
+              </span>
+
               {/* Auth / User Selector Dropdown */}
               <div className="relative">
-                {isAuthenticated ? (
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/40 hover:bg-indigo-50 text-slate-700 text-sm transition-colors"
-                  >
-                    <div className="w-7 h-7 rounded-full bg-indigo-600 border border-indigo-700 flex items-center justify-center text-white font-bold text-xs">
-                      {currentUserName?.charAt(0)?.toUpperCase() || 'U'}
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 transition-all shadow-xs"
+                >
+                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                    {currentUserName ? currentUserName.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div className="text-left hidden lg:block">
+                    <div className="text-xs font-semibold text-slate-900 leading-tight">
+                      {currentUserName}
                     </div>
-                    <div className="hidden sm:block text-left text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-slate-900 block truncate max-w-[120px]">
-                          {currentUserName}
-                        </span>
-                        {getRoleBadge()}
-                      </div>
-                      <span className="text-[10px] text-slate-400 block truncate max-w-[120px]">
-                        {currentUserEmail}
-                      </span>
-                    </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setAuthModalTab('login');
-                      setShowAuthModal(true);
-                    }}
-                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm shadow-indigo-100 transition-colors"
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span>Đăng Nhập</span>
-                  </button>
-                )}
-
-                {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 text-sm">
-                    {/* User Info Header */}
-                    <div className="px-4 py-3 border-b border-slate-100">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
-                          {currentUserName?.charAt(0)?.toUpperCase() || 'U'}
-                        </div>
-                        <div className="overflow-hidden">
-                          <p className="font-bold text-slate-900 text-xs truncate">{currentUserName}</p>
-                          <p className="text-[11px] text-slate-500 truncate">{currentUserEmail}</p>
-                          <div className="mt-1">{getRoleBadge()}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Navigation inside user menu */}
-                    <div className="py-1 border-b border-slate-100 text-xs">
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setShowProfileModal(true);
-                        }}
-                        className="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-medium"
-                      >
-                        <UserCheck className="w-4 h-4 text-indigo-500" />
-                        <span>Hồ sơ cá nhân (User Profile)</span>
-                      </button>
-                      <Link
-                        to="/operator"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-medium"
-                      >
-                        <Briefcase className="w-4 h-4 text-indigo-500" />
-                        <span>Cổng Quản Trị Tour (Operator)</span>
-                      </Link>
-                      <Link
-                        to="/bookings"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-slate-700 font-medium"
-                      >
-                        <History className="w-4 h-4 text-slate-400" />
-                        <span>Lịch sử đặt tour</span>
-                      </Link>
-                      <Link
-                        to="/wallet"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-slate-700 font-medium"
-                      >
-                        <Wallet className="w-4 h-4 text-slate-400" />
-                        <span>Ví điện tử cá nhân</span>
-                      </Link>
-                    </div>
-
-                    {/* Preset Users Switcher */}
-                    <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                        Chuyển nhanh tài khoản demo
-                      </p>
-                      <div className="space-y-1">
-                        {presetUsers.map((u) => (
-                          <button
-                            key={u.id}
-                            onClick={() => {
-                              switchUser(u.id, u.name, u.roles);
-                              setShowUserMenu(false);
-                            }}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 flex items-center justify-between text-xs transition-colors ${
-                              currentUserId === u.id ? 'font-bold text-indigo-600 bg-indigo-50/60' : 'text-slate-600'
-                            }`}
-                          >
-                            <span className="truncate">{u.name}</span>
-                            {currentUserId === u.id && <Sparkles className="w-3 h-3 text-indigo-600 flex-shrink-0" />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Logout button */}
-                    <div className="p-2">
-                      <button
-                        onClick={() => {
-                          logout();
-                          setShowUserMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-50 text-rose-600 hover:text-rose-700 text-xs font-semibold flex items-center gap-2 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>Đăng xuất tài khoản</span>
-                      </button>
+                    <div className="text-[10px] text-slate-500 leading-tight">
+                      ID: {currentUserId} • {roleBadge.label}
                     </div>
                   </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                {dropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setDropdownOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+                      {/* User Header */}
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <div className="font-semibold text-slate-900 text-sm flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>{currentUserName}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {currentUserEmail} (ID: #{currentUserId})
+                        </div>
+                      </div>
+
+                      {/* Profile & Auth Actions */}
+                      <div className="py-1 border-b border-slate-100">
+                        <button
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            setShowProfileModal(true);
+                          }}
+                          className="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-medium"
+                        >
+                          <UserCheck className="w-4 h-4 text-indigo-500" />
+                          <span>Hồ sơ cá nhân (User Profile)</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            setAuthModalTab('login');
+                            setShowAuthModal(true);
+                          }}
+                          className="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-medium"
+                        >
+                          <LogIn className="w-4 h-4 text-indigo-500" />
+                          <span>Đăng nhập / Đăng ký tài khoản khác</span>
+                        </button>
+                      </div>
+
+                      {/* Preset Users Switcher */}
+                      <div className="px-4 py-2 border-b border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Mô phỏng truy cập vai trò (Demo)
+                        </p>
+                        <div className="space-y-1">
+                          {PRESET_USERS.map((user) => {
+                            const isCurrent = user.id === currentUserId;
+                            const badge = getRoleBadge(user.role);
+                            return (
+                              <button
+                                key={user.id}
+                                onClick={() => {
+                                  switchUser(user);
+                                  setDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-start gap-2.5 p-2 rounded-lg text-left transition-colors ${
+                                  isCurrent ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 font-bold shrink-0 mt-0.5">
+                                  {user.name.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-slate-900 truncate">{user.name}</span>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium ${badge.color}`}>
+                                      {badge.label}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 truncate">{user.email} (ID: {user.id})</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Logout */}
+                      <div className="p-2">
+                        <button
+                          onClick={() => {
+                            logout();
+                            setDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-2 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Đăng xuất</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -268,4 +327,6 @@ export const Navbar = () => {
       />
     </>
   );
-};
+}
+
+export { Navbar };

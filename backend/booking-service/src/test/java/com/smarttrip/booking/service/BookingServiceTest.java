@@ -404,4 +404,42 @@ class BookingServiceTest {
         assertThat(response.getSteps()).hasSize(1);
         assertThat(response.getSteps().get(0).getStepName()).isEqualTo("RESERVE_TOUR");
     }
+
+    @Test
+    @DisplayName("Should retrieve all Saga instances with their steps")
+    void getAllSagas_success() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .bookingCode("BK-SAGA-1")
+                .status("CONFIRMED")
+                .build();
+
+        SagaInstance saga = SagaInstance.builder()
+                .id(10L)
+                .sagaId("saga-123")
+                .bookingId(1L)
+                .sagaType("BOOKING_CREATE")
+                .status("COMPLETED")
+                .currentStep("COMPLETED")
+                .build();
+
+        SagaStep step = SagaStep.builder()
+                .id(100L)
+                .sagaInstance(saga)
+                .stepName("RESERVE_TOUR")
+                .actionType("COMMAND")
+                .status("COMPLETED")
+                .build();
+
+        org.mockito.Mockito.when(sagaInstanceRepository.findAll(org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of(saga));
+        org.mockito.Mockito.when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        org.mockito.Mockito.when(sagaStepRepository.findBySagaInstanceSagaId("saga-123")).thenReturn(List.of(step));
+
+        List<SagaStatusResponse> response = bookingService.getAllSagas();
+
+        assertThat(response).isNotEmpty();
+        assertThat(response.get(0).getBookingCode()).isEqualTo("BK-SAGA-1");
+        assertThat(response.get(0).getSteps()).hasSize(1);
+    }
 }

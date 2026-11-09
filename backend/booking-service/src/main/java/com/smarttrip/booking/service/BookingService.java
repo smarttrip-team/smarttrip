@@ -12,4 +12,5 @@ public interface BookingService {
     List<BookingResponse> getBookingsByCustomerId(Long customerId);
     BookingResponse cancelBooking(String bookingCode, Long customerId);
     SagaStatusResponse getSagaStatusByBookingCode(String bookingCode);
+    List<SagaStatusResponse> getAllSagas();
 }

@@ -11,4 +11,5 @@ public interface TourService {
     TourResponse createTour(CreateTourRequest request, Long operatorId);
     DepartureResponse addDeparture(Long tourId, CreateDepartureRequest request);
     DepartureSnapshotResponse getDepartureSnapshot(Long departureId);
+    DepartureResponse updateDepartureCapacity(Long departureId, Integer totalSeats, Integer availableSeats);
 }

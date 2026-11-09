@@ -3,6 +3,13 @@ import { walletApi, authApi } from '../services/api';
 
 const AuthWalletContext = createContext(null);
 
+export const PRESET_USERS = [
+  { id: 10, name: 'Lê Quang Vĩnh', email: 'vinhle@smarttrip.com', role: 'ROLE_CUSTOMER', roleLabel: 'Customer' },
+  { id: 1, name: 'Nguyễn Hồng Thái (Operator)', email: 'operator@smarttrip.com', role: 'ROLE_TOUR_OPERATOR', roleLabel: 'Tour Operator' },
+  { id: 2, name: 'Khách sạn Mường Thanh (Manager)', email: 'hotelier@smarttrip.com', role: 'ROLE_HOTEL_MANAGER', roleLabel: 'Hotel Manager' },
+  { id: 3, name: 'Hệ thống Quản trị (Admin)', email: 'admin@smarttrip.com', role: 'ROLE_ADMIN', roleLabel: 'Admin' },
+];
+
 export const AuthWalletProvider = ({ children }) => {
   const [token, setToken] = useState(() => {
     return localStorage.getItem('smarttrip_token') || null;
@@ -17,7 +24,11 @@ export const AuthWalletProvider = ({ children }) => {
   });
 
   const [currentUserEmail, setCurrentUserEmail] = useState(() => {
-    return localStorage.getItem('smarttrip_user_email') || 'vinh@smarttrip.vn';
+    return localStorage.getItem('smarttrip_user_email') || 'vinhle@smarttrip.com';
+  });
+
+  const [currentRole, setCurrentRole] = useState(() => {
+    return localStorage.getItem('smarttrip_user_role') || 'ROLE_CUSTOMER';
   });
 
   const [roles, setRoles] = useState(() => {
@@ -69,12 +80,15 @@ export const AuthWalletProvider = ({ children }) => {
     localStorage.setItem('smarttrip_user_id', String(currentUserId));
     localStorage.setItem('smarttrip_user_name', currentUserName);
     localStorage.setItem('smarttrip_user_email', currentUserEmail);
+    localStorage.setItem('smarttrip_user_role', currentRole);
     localStorage.setItem('smarttrip_roles', JSON.stringify(roles));
     if (token) {
       localStorage.setItem('smarttrip_token', token);
     }
-    refreshWallet(currentUserId);
-  }, [currentUserId, currentUserName, currentUserEmail, roles, token, refreshWallet]);
+    if (currentRole === 'ROLE_CUSTOMER') {
+      refreshWallet(currentUserId);
+    }
+  }, [currentUserId, currentUserName, currentUserEmail, currentRole, roles, token, refreshWallet]);
 
   // Login handler
   const login = async (email, password) => {
@@ -88,11 +102,13 @@ export const AuthWalletProvider = ({ children }) => {
         setCurrentUserEmail(data.email);
         const userRoles = Array.from(data.roles || ['ROLE_CUSTOMER']);
         setRoles(userRoles);
+        setCurrentRole(userRoles[0] || 'ROLE_CUSTOMER');
 
         localStorage.setItem('smarttrip_token', data.token);
         localStorage.setItem('smarttrip_user_id', String(data.id));
         localStorage.setItem('smarttrip_user_name', data.fullName || data.email);
         localStorage.setItem('smarttrip_user_email', data.email);
+        localStorage.setItem('smarttrip_user_role', userRoles[0] || 'ROLE_CUSTOMER');
         localStorage.setItem('smarttrip_roles', JSON.stringify(userRoles));
 
         showToast(`Đăng nhập thành công! Chào mừng ${data.fullName || data.email}`, 'success');
@@ -119,11 +135,13 @@ export const AuthWalletProvider = ({ children }) => {
         setCurrentUserEmail(data.email);
         const userRoles = Array.from(data.roles || ['ROLE_CUSTOMER']);
         setRoles(userRoles);
+        setCurrentRole(userRoles[0] || 'ROLE_CUSTOMER');
 
         localStorage.setItem('smarttrip_token', data.token);
         localStorage.setItem('smarttrip_user_id', String(data.id));
         localStorage.setItem('smarttrip_user_name', data.fullName || data.email);
         localStorage.setItem('smarttrip_user_email', data.email);
+        localStorage.setItem('smarttrip_user_role', userRoles[0] || 'ROLE_CUSTOMER');
         localStorage.setItem('smarttrip_roles', JSON.stringify(userRoles));
 
         showToast(`Đăng ký tài khoản thành công! Chào mừng ${data.fullName || data.email}`, 'success');
@@ -145,16 +163,47 @@ export const AuthWalletProvider = ({ children }) => {
     showToast('Đã đăng xuất khỏi tài khoản', 'info');
   };
 
-  // Demo user switcher
-  const switchUser = (newId, newName, newRoles = ['ROLE_CUSTOMER']) => {
-    setCurrentUserId(newId);
+  // Flexible user / role switcher (supports both object and separate args)
+  const switchUser = (userOrId, newName, newRole) => {
+    if (typeof userOrId === 'object' && userOrId !== null) {
+      setCurrentUserId(userOrId.id);
+      setCurrentUserName(userOrId.name);
+      if (userOrId.email) setCurrentUserEmail(userOrId.email);
+      const roleStr = userOrId.role || 'ROLE_CUSTOMER';
+      setCurrentRole(roleStr);
+      setRoles([roleStr]);
+      showToast(`Đã chuyển vai trò: ${userOrId.roleLabel || roleStr} (${userOrId.name})`, 'info');
+      return;
+    }
+
+    const id = Number(userOrId);
+    const matched = PRESET_USERS.find((u) => u.id === id);
+    setCurrentUserId(id);
     if (newName) setCurrentUserName(newName);
-    setRoles(newRoles);
-    showToast(`Đã chuyển sang tài khoản ID: ${newId} (${newName || 'User ' + newId})`, 'info');
+    else if (matched) setCurrentUserName(matched.name);
+    if (matched?.email) setCurrentUserEmail(matched.email);
+
+    const targetRole = newRole || (matched ? matched.role : 'ROLE_CUSTOMER');
+    setCurrentRole(targetRole);
+    setRoles(Array.isArray(targetRole) ? targetRole : [targetRole]);
+    showToast(`Đã chuyển sang tài khoản ID: ${id} (${newName || matched?.name || 'User ' + id})`, 'info');
   };
 
-  const isOperator = roles.includes('ROLE_TOUR_OPERATOR') || roles.includes('ROLE_ADMIN');
-  const isAdmin = roles.includes('ROLE_ADMIN');
+  const switchRole = (role) => {
+    setCurrentRole(role);
+    setRoles([role]);
+    const matched = PRESET_USERS.find((u) => u.role === role);
+    if (matched) {
+      setCurrentUserId(matched.id);
+      setCurrentUserName(matched.name);
+      if (matched.email) setCurrentUserEmail(matched.email);
+    }
+    showToast(`Đã đổi phân quyền sang: ${role}`, 'info');
+  };
+
+  const isOperator = currentRole === 'ROLE_TOUR_OPERATOR' || currentRole === 'ROLE_ADMIN' || roles.includes('ROLE_TOUR_OPERATOR') || roles.includes('ROLE_ADMIN');
+  const isAdmin = currentRole === 'ROLE_ADMIN' || roles.includes('ROLE_ADMIN');
+  const isHotelManager = currentRole === 'ROLE_HOTEL_MANAGER' || currentRole === 'ROLE_ADMIN' || roles.includes('ROLE_HOTEL_MANAGER');
   const isAuthenticated = Boolean(token);
 
   return (
@@ -164,9 +213,11 @@ export const AuthWalletProvider = ({ children }) => {
         currentUserId,
         currentUserName,
         currentUserEmail,
+        currentRole,
         roles,
         isOperator,
         isAdmin,
+        isHotelManager,
         isAuthenticated,
         wallet,
         loadingWallet,
@@ -175,12 +226,13 @@ export const AuthWalletProvider = ({ children }) => {
         register,
         logout,
         switchUser,
+        switchRole,
         showToast,
       }}
     >
       {children}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-0 text-white bg-slate-900 border border-slate-700">
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl text-sm font-medium transition-all duration-300 text-white bg-slate-900 border border-slate-700">
           <span
             className={`w-2.5 h-2.5 rounded-full ${
               toast.type === 'success'

@@ -44,14 +44,31 @@ export const tourApi = {
 };
 
 export const operatorApi = {
-  createTour: (payload) => API.post('/api/v1/operator/tours', payload),
-  addDeparture: (tourId, payload) => API.post(`/api/v1/operator/tours/${tourId}/departures`, payload),
+  createTour: (data) => API.post('/api/v1/operator/tours', data),
+  addDeparture: (tourId, data) => API.post(`/api/v1/operator/tours/${tourId}/departures`, data),
+  updateCapacity: (depId, totalSeats, availableSeats) => {
+    const params = new URLSearchParams();
+    if (totalSeats !== undefined && totalSeats !== null) params.append('totalSeats', totalSeats);
+    if (availableSeats !== undefined && availableSeats !== null) params.append('availableSeats', availableSeats);
+    return API.patch(`/api/v1/operator/tours/departures/${depId}/capacity?${params.toString()}`);
+  },
 };
 
 export const hotelApi = {
-  getHotels: () => API.get('/api/v1/hotels'),
+  getHotels: (location) => API.get(`/api/v1/hotels${location ? `?location=${encodeURIComponent(location)}` : ''}`),
   getHotelById: (id) => API.get(`/api/v1/hotels/${id}`),
-  getRoomTypes: (hotelId) => API.get(`/api/v1/hotels/${hotelId}/room-types`),
+  checkAvailability: (id, checkIn, checkOut, roomTypeId) => {
+    const params = new URLSearchParams({ checkIn, checkOut });
+    if (roomTypeId) params.append('roomTypeId', roomTypeId);
+    return API.get(`/api/v1/hotels/${id}/availability?${params.toString()}`);
+  },
+};
+
+export const hotelManagerApi = {
+  createHotel: (data) => API.post('/api/v1/manager/hotels', data),
+  updateHotel: (id, data) => API.put(`/api/v1/manager/hotels/${id}`, data),
+  addRoomType: (hotelId, data) => API.post(`/api/v1/manager/hotels/${hotelId}/room-types`, data),
+  updateInventory: (roomTypeId, data) => API.post(`/api/v1/manager/room-types/${roomTypeId}/inventory`, data),
 };
 
 export const walletApi = {
@@ -66,6 +83,13 @@ export const bookingApi = {
   getSagaStatus: (bookingCode) => API.get(`/api/v1/bookings/${bookingCode}/saga`),
   getCustomerBookings: (customerId) => API.get(`/api/v1/bookings?customerId=${customerId}`),
   cancelBooking: (bookingCode) => API.post(`/api/v1/bookings/${bookingCode}/cancel`),
+};
+
+export const adminApi = {
+  getUsers: () => API.get('/api/v1/users'),
+  getUserById: (id) => API.get(`/api/v1/users/${id}`),
+  updateUserStatus: (userId, status) => API.patch(`/api/v1/users/${userId}/status?status=${status}`),
+  getAllSagas: () => API.get('/api/v1/bookings/sagas'),
 };
 
 export default API;

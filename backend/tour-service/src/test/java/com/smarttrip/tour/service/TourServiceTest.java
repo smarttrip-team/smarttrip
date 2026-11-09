@@ -270,4 +270,16 @@ class TourServiceTest {
         assertEquals(1, result.getTotalElements());
         assertEquals("Da Nang Discovery 3D2N", result.getContent().get(0).getTitle());
     }
+
+    @Test
+    void testUpdateDepartureCapacity_Success() {
+        when(departureRepository.findById(1001L)).thenReturn(Optional.of(sampleDeparture));
+        when(departureRepository.save(any(TourDeparture.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        DepartureResponse response = tourService.updateDepartureCapacity(1001L, 30, 25);
+
+        assertNotNull(response);
+        assertEquals(30, response.getTotalSeats());
+        assertEquals(25, response.getAvailableSeats());
+    }
 }

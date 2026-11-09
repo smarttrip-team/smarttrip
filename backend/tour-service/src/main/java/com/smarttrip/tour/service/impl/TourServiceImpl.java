@@ -126,6 +126,24 @@ public class TourServiceImpl implements TourService {
                 .build();
     }
 
+
+    @Override
+    @Transactional
+    public DepartureResponse updateDepartureCapacity(Long departureId, Integer totalSeats, Integer availableSeats) {
+        TourDeparture departure = departureRepository.findById(departureId)
+                .orElseThrow(() -> new ResourceNotFoundException("Departure not found with id: " + departureId));
+
+        if (totalSeats != null) {
+            departure.setTotalSeats(totalSeats);
+        }
+        if (availableSeats != null) {
+            departure.setAvailableSeats(availableSeats);
+        }
+
+        TourDeparture saved = departureRepository.save(departure);
+        return toDepartureResponse(saved);
+    }
+
     private TourResponse toTourResponse(Tour tour) {
         List<TourDeparture> upcoming = departureRepository.findByTourIdAndDepartureDateAfterAndStatusOrderByDepartureDateAsc(
                 tour.getId(), LocalDate.now().minusDays(1), DepartureStatus.SCHEDULED);

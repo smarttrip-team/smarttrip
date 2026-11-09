@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
@@ -18,6 +20,12 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+
+    @GetMapping
+    @Operation(summary = "Get all users (Admin)")
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
+    }
 
     @GetMapping("/me")
     @Operation(summary = "Get current user profile")
@@ -38,5 +46,13 @@ public class UserController {
     @Operation(summary = "Get user by ID")
     public ResponseEntity<UserResponse> getUserById(@PathVariable("id") Long id) {
         return ResponseEntity.ok(userService.getUserById(id));
+    }
+
+    @PatchMapping("/{id}/status")
+    @Operation(summary = "Update user status (Admin)")
+    public ResponseEntity<UserResponse> updateUserStatus(
+            @PathVariable("id") Long id,
+            @RequestParam("status") String status) {
+        return ResponseEntity.ok(userService.updateUserStatus(id, status));
     }
 }

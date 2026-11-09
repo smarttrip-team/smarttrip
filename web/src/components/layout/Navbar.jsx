@@ -124,24 +124,29 @@ export default function Navbar() {
                 </div>
               </Link>
 
-              {/* Core Navigation Links */}
+              {/* Core Navigation Links (Consolidated & Streamlined) */}
               <nav className="hidden md:flex items-center gap-6 text-sm">
-                <Link to="/" className={`py-5 ${location.pathname === '/' ? 'text-sky-600 font-bold' : 'text-slate-700 hover:text-sky-600'}`}>
-                  Trang chủ
-                </Link>
-                <Link to="/tours" className={`py-5 ${isActive('/tours')}`}>
+                <Link
+                  to="/tours"
+                  className={`py-5 ${
+                    location.pathname === '/' || location.pathname === '/tours' || location.pathname.startsWith('/tours/')
+                      ? 'text-sky-600 font-bold border-b-2 border-sky-600'
+                      : 'text-slate-700 hover:text-sky-600 font-medium transition-colors'
+                  }`}
+                >
                   Khám phá Tour
                 </Link>
-                <Link to="/tours" className="py-5 text-slate-700 hover:text-sky-600 transition-colors">
-                  Điểm đến
-                </Link>
 
-                {/* Additional Role Badges / Links */}
+                {/* Customer Bookings & Wallet Links */}
                 {currentRole === 'ROLE_CUSTOMER' && (
                   <>
                     <Link to="/bookings" className={`py-5 flex items-center gap-1.5 ${isActive('/bookings')}`}>
                       <CalendarCheck className="w-4 h-4 text-sky-500" />
                       Đơn đặt chỗ
+                    </Link>
+                    <Link to="/wallet" className={`py-5 flex items-center gap-1.5 ${isActive('/wallet')}`}>
+                      <Wallet className="w-4 h-4 text-emerald-500" />
+                      Ví SmartTrip
                     </Link>
                   </>
                 )}

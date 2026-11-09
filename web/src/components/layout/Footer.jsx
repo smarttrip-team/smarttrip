@@ -31,7 +31,7 @@ export const Footer = () => {
           <div>
             <h4 className="font-semibold text-slate-900 text-xs uppercase tracking-wider mb-3">Khách hàng</h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="/" className="hover:text-indigo-600">Khám phá Tour</a></li>
+              <li><a href="/tours" className="hover:text-indigo-600">Khám phá Tour</a></li>
               <li><a href="/wallet" className="hover:text-indigo-600">Ví điện tử & Nạp tiền</a></li>
               <li><a href="/bookings" className="hover:text-indigo-600">Theo dõi & Lịch sử đặt tour</a></li>
             </ul>
@@ -41,13 +41,13 @@ export const Footer = () => {
             <h4 className="font-semibold text-slate-900 text-xs uppercase tracking-wider mb-3">Học phần</h4>
             <p className="text-xs text-slate-500 mb-2">MSS301 - Microservices Architecture & Distributed Systems</p>
             <span className="inline-block px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-[11px] font-mono">
-              v1.0.0-CP4
+              v1.0.0-FA26
             </span>
           </div>
         </div>
 
         <div className="pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} SmartTrip Team (Lê Quang Vĩnh & Nguyễn Hồng Thái). All rights reserved.
+          © {new Date().getFullYear()} SmartTrip Team (Lê Quang Vinh & Nguyễn Hồng Thái). All rights reserved.
         </div>
       </div>
     </footer>

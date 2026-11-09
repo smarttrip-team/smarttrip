@@ -240,9 +240,7 @@ export const TourListPage = () => {
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
             Khám Phá Việt Nam Cùng <span className="bg-gradient-to-r from-indigo-400 to-indigo-200 bg-clip-text text-transparent">SmartTrip</span>
           </h1>
-          <p className="max-w-2xl mx-auto text-slate-300 text-sm sm:text-base leading-relaxed">
-            Tìm kiếm tour du lịch trọn gói, tích hợp giữ phòng khách sạn đối tác và thanh toán tức thì qua ví điện tử với cam kết Saga Transaction 100% tin cậy.
-          </p>
+          
 
           {/* Quick Search Box */}
           <div className="max-w-3xl mx-auto bg-white/10 backdrop-blur-md p-2.5 rounded-2xl border border-white/15 shadow-2xl flex flex-col sm:flex-row gap-2">
@@ -277,71 +275,103 @@ export const TourListPage = () => {
 
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Filter Controls Bar (Issue #17) */}
+        {/* Filter Controls Bar (Issue #17 & Smart Dropdown) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            {/* Destination Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" /> Điểm đến:
-              </span>
-              {destinations.map((dest) => (
-                <button
-                  key={dest}
-                  onClick={() => setSelectedDestination(dest)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-                    selectedDestination === dest
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                  }`}
-                >
-                  {dest === 'ALL' ? 'Tất cả điểm đến' : dest}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            {/* Left: Dropdown Selectors Toolbar */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Destination Dropdown */}
+              <div className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 px-3.5 py-2 rounded-xl transition-all shadow-xs">
+                <MapPin className="w-4 h-4 text-sky-600 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Điểm đến</span>
+                  <select
+                    value={selectedDestination}
+                    onChange={(e) => setSelectedDestination(e.target.value)}
+                    className="bg-transparent font-semibold text-slate-800 text-xs sm:text-sm focus:outline-none cursor-pointer pr-2 max-w-[200px] truncate"
+                  >
+                    <option value="ALL">Tất cả điểm đến ({destinations.length - 1} địa danh)</option>
+                    {destinations.filter(d => d !== 'ALL').map((dest) => (
+                      <option key={dest} value={dest}>
+                        {dest}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-            {/* Filter by Price & Sort */}
-            <div className="flex flex-wrap items-center gap-2.5 self-end md:self-auto text-xs">
               {/* Price selector */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                <span className="text-slate-400 font-medium">Khoảng giá:</span>
-                <select
-                  value={priceFilter}
-                  onChange={(e) => setPriceFilter(e.target.value)}
-                  className="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL">Mọi mức giá</option>
-                  <option value="UNDER_4M">Dưới 4.000.000 đ</option>
-                  <option value="4M_TO_5M">4.000.000 - 5.000.000 đ</option>
-                  <option value="OVER_5M">Trên 5.000.000 đ</option>
-                </select>
+              <div className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 px-3.5 py-2 rounded-xl transition-all shadow-xs">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Khoảng giá</span>
+                  <select
+                    value={priceFilter}
+                    onChange={(e) => setPriceFilter(e.target.value)}
+                    className="bg-transparent font-semibold text-slate-800 text-xs sm:text-sm focus:outline-none cursor-pointer pr-2"
+                  >
+                    <option value="ALL">Mọi mức giá</option>
+                    <option value="UNDER_4M">Dưới 4.000.000 đ</option>
+                    <option value="4M_TO_5M">4.000.000 - 5.000.000 đ</option>
+                    <option value="OVER_5M">Trên 5.000.000 đ</option>
+                  </select>
+                </div>
               </div>
 
               {/* Sort selector */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                <span className="text-slate-400 font-medium">Sắp xếp:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer"
-                >
-                  <option value="DEFAULT">Mặc định</option>
-                  <option value="PRICE_ASC">Giá tăng dần</option>
-                  <option value="PRICE_DESC">Giá giảm dần</option>
-                  <option value="RATING_DESC">Đánh giá cao nhất</option>
-                </select>
+              <div className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 px-3.5 py-2 rounded-xl transition-all shadow-xs">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sắp xếp</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-transparent font-semibold text-slate-800 text-xs sm:text-sm focus:outline-none cursor-pointer pr-2"
+                  >
+                    <option value="DEFAULT">Mặc định</option>
+                    <option value="PRICE_ASC">Giá tăng dần</option>
+                    <option value="PRICE_DESC">Giá giảm dần</option>
+                    <option value="RATING_DESC">Đánh giá cao nhất</option>
+                  </select>
+                </div>
               </div>
 
               {/* Reset button if active filters */}
               {(searchKeyword || selectedDestination !== 'ALL' || priceFilter !== 'ALL' || sortBy !== 'DEFAULT') && (
                 <button
                   onClick={handleResetFilters}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 font-semibold border border-rose-200 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 font-semibold border border-rose-200 text-xs transition-colors shadow-xs"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Xóa lọc
+                  <span>Xóa lọc</span>
                 </button>
               )}
+            </div>
+
+            {/* Right: Quick tags for top popular destinations */}
+            <div className="flex items-center gap-1.5 flex-wrap text-xs">
+              <span className="text-slate-400 font-medium text-[11px] mr-1 hidden sm:inline">Phổ biến:</span>
+              {[
+                { label: 'Tất cả', val: 'ALL' },
+                { label: 'Đà Nẵng', val: 'Đà Nẵng & Bà Nà Hills' },
+                { label: 'Hạ Long', val: 'Vịnh Hạ Long' },
+                { label: 'Phú Quốc', val: 'Phú Quốc' },
+                { label: 'Nha Trang', val: 'Vịnh Nha Trang Biển Xanh' },
+                { label: 'Sa Pa', val: 'Sa Pa & Fansipan' },
+              ].map((p) => {
+                const isSelected = selectedDestination === p.val || (p.val === 'ALL' && selectedDestination === 'ALL');
+                return (
+                  <button
+                    key={p.label}
+                    onClick={() => setSelectedDestination(p.val)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'bg-sky-500 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

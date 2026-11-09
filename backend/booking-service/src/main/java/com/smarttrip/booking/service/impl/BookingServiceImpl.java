@@ -11,6 +11,7 @@ import com.smarttrip.booking.exception.ResourceNotFoundException;
 import com.smarttrip.booking.exception.UserBlockedException;
 import com.smarttrip.booking.repository.BookingRepository;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
+import com.smarttrip.booking.repository.SagaStepRepository;
 import com.smarttrip.booking.saga.BookingSagaOrchestrator;
 import com.smarttrip.booking.service.BookingService;
 import feign.FeignException;
@@ -23,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,6 +36,7 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final SagaInstanceRepository sagaInstanceRepository;
+    private final SagaStepRepository sagaStepRepository;
     private final UserFeignClient userFeignClient;
     private final TourFeignClient tourFeignClient;
     private final BookingSagaOrchestrator sagaOrchestrator;
@@ -178,6 +181,7 @@ public class BookingServiceImpl implements BookingService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
+
     @Override
     @Transactional
     public BookingResponse cancelBooking(String bookingCode, Long customerId) {
@@ -205,6 +209,57 @@ public class BookingServiceImpl implements BookingService {
 
         log.info("Booking {} successfully cancelled by customer {}", bookingCode, customerId);
         return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SagaStatusResponse getSagaStatusByBookingCode(String bookingCode) {
+        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with code: " + bookingCode));
+
+        SagaInstance saga = sagaInstanceRepository.findByBookingId(booking.getId())
+                .orElse(null);
+
+        if (saga == null) {
+            return SagaStatusResponse.builder()
+                    .bookingId(booking.getId())
+                    .bookingCode(bookingCode)
+                    .status(booking.getStatus())
+                    .currentStep(booking.getStatus())
+                    .build();
+        }
+
+        List<SagaStep> steps = sagaStepRepository != null
+                ? sagaStepRepository.findBySagaInstanceSagaId(saga.getSagaId())
+                : saga.getSteps();
+
+        List<SagaStepResponse> stepResponses = new ArrayList<>();
+        if (steps != null) {
+            for (SagaStep s : steps) {
+                stepResponses.add(SagaStepResponse.builder()
+                        .stepName(s.getStepName())
+                        .actionType(s.getActionType())
+                        .status(s.getStatus())
+                        .attemptCount(s.getAttemptCount())
+                        .lastError(s.getLastError())
+                        .startedAt(s.getStartedAt())
+                        .completedAt(s.getCompletedAt())
+                        .build());
+            }
+        }
+
+        return SagaStatusResponse.builder()
+                .sagaId(saga.getSagaId())
+                .bookingId(booking.getId())
+                .bookingCode(bookingCode)
+                .sagaType(saga.getSagaType())
+                .status(saga.getStatus())
+                .currentStep(saga.getCurrentStep())
+                .failureReason(saga.getFailureReason())
+                .steps(stepResponses)
+                .startedAt(saga.getStartedAt())
+                .completedAt(saga.getCompletedAt())
+                .build();
     }
 
     private void validateCustomerStatus(Long customerId) {

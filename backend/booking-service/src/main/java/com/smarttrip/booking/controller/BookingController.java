@@ -2,6 +2,7 @@ package com.smarttrip.booking.controller;
 
 import com.smarttrip.booking.dto.BookingCreateRequest;
 import com.smarttrip.booking.dto.BookingResponse;
+import com.smarttrip.booking.dto.SagaStatusResponse;
 import com.smarttrip.booking.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,11 @@ public class BookingController {
     @GetMapping({"/api/v1/bookings/{bookingCode}", "/api/bookings/code/{bookingCode}"})
     public ResponseEntity<BookingResponse> getBookingByCode(@PathVariable String bookingCode) {
         return ResponseEntity.ok(bookingService.getBookingByCode(bookingCode));
+    }
+
+    @GetMapping({"/api/v1/bookings/{bookingCode}/saga", "/api/bookings/{bookingCode}/saga"})
+    public ResponseEntity<SagaStatusResponse> getSagaStatus(@PathVariable String bookingCode) {
+        return ResponseEntity.ok(bookingService.getSagaStatusByBookingCode(bookingCode));
     }
 
     @GetMapping("/api/v1/bookings")

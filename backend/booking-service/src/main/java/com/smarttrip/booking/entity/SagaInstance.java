@@ -37,8 +37,7 @@ public class SagaInstance {
 
     @Version
     @Column(nullable = false)
-    @Builder.Default
-    private Long version = 0L;
+    private Long version;
 
     @Column(name = "failure_reason", columnDefinition = "TEXT")
     private String failureReason;

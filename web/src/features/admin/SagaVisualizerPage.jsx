@@ -85,22 +85,32 @@ export default function SagaVisualizerPage() {
     showToast('Đã sao chép mã Saga', 'info');
   };
 
-  // Filtered list
+  // Calculate statistics
+  const totalCount = sagas.length;
+  const completedCount = sagas.filter((s) => s.status === 'COMPLETED').length;
+  const failedCount = sagas.filter((s) => s.status === 'FAILED' || s.status === 'COMPENSATED').length;
+  const inProgressCount = sagas.filter((s) => s.status === 'STARTED' || s.status === 'PROCESSING' || s.status === 'COMPENSATING').length;
+  const successRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
+
+  // Filtered list with multi-status matching (e.g. FAILED matches both FAILED and COMPENSATED)
   const filteredSagas = sagas.filter((s) => {
-    const matchStatus = filterStatus === 'ALL' || s.status === filterStatus;
+    let matchStatus = true;
+    if (filterStatus === 'COMPLETED') {
+      matchStatus = s.status === 'COMPLETED';
+    } else if (filterStatus === 'PROCESSING' || filterStatus === 'STARTED') {
+      matchStatus = s.status === 'PROCESSING' || s.status === 'STARTED' || s.status === 'COMPENSATING';
+    } else if (filterStatus === 'FAILED' || filterStatus === 'COMPENSATED') {
+      matchStatus = s.status === 'FAILED' || s.status === 'COMPENSATED';
+    } else if (filterStatus !== 'ALL') {
+      matchStatus = s.status === filterStatus;
+    }
+
     const matchSearch =
       !searchQuery ||
       s.sagaId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.bookingCode?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchStatus && matchSearch;
   });
-
-  // Calculate statistics
-  const totalCount = sagas.length;
-  const completedCount = sagas.filter((s) => s.status === 'COMPLETED').length;
-  const failedCount = sagas.filter((s) => s.status === 'FAILED' || s.status === 'COMPENSATED').length;
-  const inProgressCount = sagas.filter((s) => s.status === 'STARTED' || s.status === 'COMPENSATING').length;
-  const successRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -110,10 +120,11 @@ export default function SagaVisualizerPage() {
           label: 'COMPLETED',
           className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         };
+      case 'PROCESSING':
       case 'STARTED':
         return {
           icon: <Activity className="w-3.5 h-3.5 text-indigo-600 animate-spin" />,
-          label: 'STARTED (RUNNING)',
+          label: 'PROCESSING (RUNNING)',
           className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
         };
       case 'COMPENSATING':
@@ -282,17 +293,31 @@ export default function SagaVisualizerPage() {
 
                 {/* Filter Pills */}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {['ALL', 'COMPLETED', 'STARTED', 'COMPENSATING', 'FAILED'].map((st) => (
+                  {[
+                    { key: 'ALL', label: 'ALL', count: totalCount },
+                    { key: 'COMPLETED', label: 'COMPLETED', count: completedCount },
+                    { key: 'PROCESSING', label: 'PROCESSING', count: inProgressCount },
+                    { key: 'FAILED', label: 'FAILED / COMPENSATED', count: failedCount },
+                  ].map((tab) => (
                     <button
-                      key={st}
-                      onClick={() => setFilterStatus(st)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                        filterStatus === st
+                      key={tab.key}
+                      onClick={() => {
+                        setFilterStatus(tab.key);
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 ${
+                        filterStatus === tab.key
                           ? 'bg-slate-900 text-white shadow-xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      {st}
+                      <span>{tab.label}</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                        filterStatus === tab.key
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {tab.count}
+                      </span>
                     </button>
                   ))}
                 </div>

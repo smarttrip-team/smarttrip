@@ -151,7 +151,7 @@ public class BookingServiceImpl implements BookingService {
                 .status("STARTED")
                 .currentStep("PENDING_CONFIRMATION")
                 .build();
-        sagaInstanceRepository.save(saga);
+        saga = sagaInstanceRepository.save(saga);
 
         // Trigger Booking Saga Orchestrator
         if (sagaOrchestrator != null) {

@@ -235,6 +235,29 @@ export const BookingTrackingPage = () => {
             );
           })}
         </div>
+
+        {/* Compensation Details Banner if failed/compensated */}
+        {(status === 'FAILED' || saga?.status === 'COMPENSATED') && (
+          <div className="mt-6 p-4 rounded-xl bg-amber-50/90 border border-amber-200 space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-900 uppercase tracking-wide">
+              <RefreshCw className="w-4 h-4 text-amber-600 animate-spin-slow" />
+              <span>Hệ Thống Đã Bồi Hoàn Tự Động (Saga Compensation Completed)</span>
+            </div>
+            <p className="text-xs text-amber-800 font-medium">
+              {saga?.failureReason || 'Một bước trong giao dịch phân tán không hoàn tất. Hệ thống đã tự động thực thi chuỗi bù trừ an toàn:'}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-xs">
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/90 border border-amber-200 text-amber-950 font-semibold shadow-xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Hoàn trả 100% tiền tạm giữ về Ví điện tử</span>
+              </div>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/90 border border-amber-200 text-amber-950 font-semibold shadow-xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Giải phóng số ghế tour về kho số lượng</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Booking Details Summary */}

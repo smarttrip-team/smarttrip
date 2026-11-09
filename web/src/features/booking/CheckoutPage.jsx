@@ -22,13 +22,17 @@ export const CheckoutPage = () => {
   const [departureId, setDepartureId] = useState(initialDepartureId);
   const [departureDate, setDepartureDate] = useState(initialDepartureDate);
   const [unitPrice, setUnitPrice] = useState(initialUnitPrice);
-  const [quantity, setQuantity] = useState(2);
+  const initialQuantity = Math.max(1, Number(searchParams.get('quantity')) || 1);
+  const [quantity, setQuantity] = useState(initialQuantity);
 
   // Passengers State
-  const [passengers, setPassengers] = useState([
-    { fullName: currentUserName, phone: '0901234567', dateOfBirth: '1995-05-15' },
-    { fullName: 'Nguyễn Thị Hoa', phone: '0912345678', dateOfBirth: '1997-08-20' },
-  ]);
+  const [passengers, setPassengers] = useState(() => {
+    const list = [{ fullName: currentUserName || 'Khách hàng', phone: '0901234567', dateOfBirth: '1995-05-15' }];
+    for (let i = 1; i < initialQuantity; i++) {
+      list.push({ fullName: 'Hành khách ' + (i + 1), phone: '0901234567', dateOfBirth: '1995-05-15' });
+    }
+    return list;
+  });
 
   // Optional Hotel State
   const [includeHotel, setIncludeHotel] = useState(searchParams.get('hasHotel') === 'true');
@@ -38,11 +42,12 @@ export const CheckoutPage = () => {
   const [roomName, setRoomName] = useState(searchParams.get('roomName') || 'Deluxe Ocean View Room');
   const [roomPrice, setRoomPrice] = useState(Number(searchParams.get('hotelPrice')) || 1200000);
   const [roomQuantity, setRoomQuantity] = useState(1);
-  const [checkInDate, setCheckInDate] = useState('2026-11-20');
+  const [checkInDate, setCheckInDate] = useState(initialDepartureDate);
   const [checkOutDate, setCheckOutDate] = useState('2026-11-22');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customIdempotencyKey, setCustomIdempotencyKey] = useState('');
+  const [simulationMode, setSimulationMode] = useState('SUCCESS');
 
   // Update passenger count when quantity changes
   useEffect(() => {
@@ -86,7 +91,8 @@ export const CheckoutPage = () => {
       return;
     }
 
-    const idempotencyKey = customIdempotencyKey.trim() || `booking-${currentUserId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const keyPrefix = simulationMode === 'FAIL_AFTER_PAYMENT' ? 'FAIL_AFTER_PAYMENT-' : '';
+    const idempotencyKey = customIdempotencyKey.trim() || `${keyPrefix}booking-${currentUserId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
     const payload = {
       customerId: currentUserId,
@@ -126,7 +132,8 @@ export const CheckoutPage = () => {
       // Redirect to Booking Tracking screen
       navigate(`/tracking/${createdBooking?.bookingCode}`);
     } catch (err) {
-      showToast(`Đặt chỗ thất bại: ${err.message}`, 'error');
+      const errorMsg = err.response?.data?.message || err.message || 'Có lỗi xảy ra khi tạo đơn đặt chỗ';
+      showToast(`Đặt chỗ thất bại: ${errorMsg}`, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -400,6 +407,27 @@ export const CheckoutPage = () => {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Saga Simulation Scenario selector */}
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5">
+              <label className="block text-xs font-bold text-amber-900 flex items-center justify-between">
+                <span>⚙️ Kịch bản Mô phỏng Saga:</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-200 text-amber-900">Test Mode</span>
+              </label>
+              <select
+                value={simulationMode}
+                onChange={(e) => setSimulationMode(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-amber-300 bg-white text-slate-800 shadow-xs focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="SUCCESS">🟢 Luồng Chuẩn: Thành công 100% (CONFIRMED)</option>
+                <option value="FAIL_AFTER_PAYMENT">🔴 Mô phỏng: Đã Tạm Giữ Tiền &rarr; Lỗi Quyết Toán &rarr; Bồi Hoàn & Hoàn Tiền Ví (COMPENSATED)</option>
+              </select>
+              <p className="text-[10px] text-amber-800 leading-tight">
+                {simulationMode === 'SUCCESS'
+                  ? 'Giao dịch đi qua đầy đủ 4 bước tuần tự và xác nhận đơn hàng thành công.'
+                  : 'Hệ thống giữ ghế tour, tạm giữ tiền ví thành công, sau đó mô phỏng đối tác từ chối để kích hoạt bồi hoàn: tự động giải phóng tiền tạm giữ trong ví và trả lại ghế tour.'}
+              </p>
             </div>
 
             {/* Idempotency key input */}

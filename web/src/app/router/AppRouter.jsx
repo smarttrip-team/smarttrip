@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from '../../components/layout/Navbar';
 import { Footer } from '../../components/layout/Footer';
 import { TourListPage } from '../../features/tours/TourListPage';
+import { TourDetailPage } from '../../features/tours/TourDetailPage';
 import { CheckoutPage } from '../../features/booking/CheckoutPage';
 import { BookingTrackingPage } from '../../features/booking/BookingTrackingPage';
 import { BookingHistoryPage } from '../../features/booking/BookingHistoryPage';
@@ -23,6 +24,7 @@ export const AppRouter = () => {
             {/* Customer Routes */}
             <Route path="/" element={<TourListPage />} />
             <Route path="/tours" element={<TourListPage />} />
+            <Route path="/tours/:id" element={<TourDetailPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/tracking/:bookingCode" element={<BookingTrackingPage />} />
             <Route path="/bookings" element={<BookingHistoryPage />} />

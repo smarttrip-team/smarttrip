@@ -39,8 +39,7 @@ public class Wallet {
 
     @Version
     @Column(nullable = false)
-    @Builder.Default
-    private Long version = 0L;
+    private Long version;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;

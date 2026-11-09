@@ -43,9 +43,10 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
     public void startSaga(Booking booking, SagaInstance saga) {
         log.info("Starting Booking Saga {} for booking {}", saga.getSagaId(), booking.getBookingCode());
 
-        saga.setStatus("PROCESSING");
-        saga.setCurrentStep("RESERVE_TOUR");
-        sagaInstanceRepository.save(saga);
+        SagaInstance managedSaga = (saga.getId() != null) ? saga : sagaInstanceRepository.findBySagaId(saga.getSagaId()).orElse(saga);
+        managedSaga.setStatus("PROCESSING");
+        managedSaga.setCurrentStep("RESERVE_TOUR");
+        saga = sagaInstanceRepository.save(managedSaga);
 
         // Record step
         recordStep(saga, "RESERVE_TOUR", "COMMAND", "PENDING");
@@ -158,6 +159,39 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + event.getBookingId()));
 
         // Step 5: Confirm resources
+        if (booking.getIdempotencyKey() != null && (
+                booking.getIdempotencyKey().contains("FAIL_AFTER_PAYMENT") ||
+                booking.getIdempotencyKey().contains("FAIL_CONFIRM") ||
+                booking.getIdempotencyKey().contains("FAIL_AFTER_HOLD"))) {
+            log.warn("Saga {}: Simulating failure at CONFIRM_RESOURCES for booking {}", sagaId, booking.getBookingCode());
+            recordStep(saga, "CONFIRM_RESOURCES", "COMMAND", "PENDING");
+            failStep(saga, "CONFIRM_RESOURCES", "Mô phỏng lỗi: Đối tác từ chối xác nhận tài nguyên (Resource unavailable) - Kích hoạt bồi hoàn toàn bộ và hoàn trả tiền ví");
+
+            // 1. Compensate Payment (Void held amount in wallet)
+            compensatePayment(saga, booking, envelope.getMessageId());
+
+            // 2. Compensate Tour (Release held seats)
+            compensateTour(saga, booking, envelope.getMessageId());
+
+            // 3. Compensate Hotel if applicable
+            if (booking.getHotelDetails() != null && !booking.getHotelDetails().isEmpty()) {
+                compensateHotel(saga, booking, envelope.getMessageId());
+            }
+
+            booking.setStatus("FAILED");
+            bookingRepository.save(booking);
+
+            saga.setStatus("COMPENSATED");
+            saga.setCurrentStep("COMPENSATED");
+            saga.setFailureReason("Lỗi xác nhận tài nguyên - Đã hoàn trả tiền ví và giải phóng chỗ ngồi");
+            saga.setCompletedAt(LocalDateTime.now());
+            sagaInstanceRepository.save(saga);
+
+            log.warn("Saga {} COMPENSATED (Payment voided & refunded, Tour released). Booking {} status set to FAILED.",
+                    saga.getSagaId(), booking.getBookingCode());
+            return;
+        }
+
         recordStep(saga, "CONFIRM_RESOURCES", "COMMAND", "PENDING");
 
         BookingItem tourItem = booking.getItems().isEmpty() ? null : booking.getItems().get(0);
@@ -332,7 +366,7 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
                 .currentStep("CHECK_CANCELLATION_POLICY")
                 .startedAt(LocalDateTime.now())
                 .build();
-        sagaInstanceRepository.save(saga);
+        saga = sagaInstanceRepository.save(saga);
 
         // 2. Check Cancellation Policy & calculate refund amount
         recordStep(saga, "CHECK_CANCELLATION_POLICY", "ACTION", "PENDING");
@@ -483,6 +517,31 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
             log.info("Enqueued ReleaseTourCommand via Outbox for booking {}", booking.getBookingCode());
         }
         completeStep(saga, "COMPENSATE_TOUR");
+    }
+
+    private void compensatePayment(SagaInstance saga, Booking booking, String causationId) {
+        recordStep(saga, "COMPENSATE_PAYMENT", "COMPENSATION", "PENDING");
+        VoidPaymentCommand voidCmd = VoidPaymentCommand.builder()
+                .bookingId(booking.getId())
+                .bookingCode(booking.getBookingCode())
+                .userId(booking.getCustomerId())
+                .amount(booking.getTotalAmount())
+                .build();
+
+        MessageEnvelope<VoidPaymentCommand> voidEnvelope = MessageEnvelope.of(
+                "VOID_PAYMENT_COMMAND", voidCmd, saga.getSagaId(), causationId
+        );
+
+        outboxPublisher.enqueueAndPublish(
+                "BOOKING",
+                booking.getId().toString(),
+                "VOID_PAYMENT_COMMAND",
+                RabbitMQConstants.EXCHANGE_COMMANDS,
+                RabbitMQConstants.ROUTING_KEY_VOID_PAYMENT,
+                voidEnvelope
+        );
+        log.info("Enqueued VoidPaymentCommand via Outbox for booking {}", booking.getBookingCode());
+        completeStep(saga, "COMPENSATE_PAYMENT");
     }
 
     private void compensateHotel(SagaInstance saga, Booking booking, String causationId) {

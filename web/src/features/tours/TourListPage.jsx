@@ -5,6 +5,7 @@ import {
   Sparkles, Search, SlidersHorizontal, RotateCcw, X, Clock, Info, ShieldCheck 
 } from 'lucide-react';
 import { tourApi } from '../../services/api';
+import { RICH_TOURS_DATA } from './TourDetailPage';
 
 // High quality seed tours with realistic itineraries
 const SEED_TOURS = [
@@ -113,25 +114,29 @@ export const TourListPage = () => {
     const fetchTours = async () => {
       setLoading(true);
       try {
-        const res = await tourApi.getTours();
+        const res = await tourApi.getTours({ size: 50 });
         const items = Array.isArray(res?.data) ? res.data : (res?.data?.content || []);
         if (items.length > 0) {
-          const mapped = items.map((t, idx) => ({
-            id: t.id,
-            name: t.name || t.title,
-            description: t.description || 'Khám phá hành trình du lịch độc đáo cùng SmartTrip.',
-            destination: t.destination || t.destinationName || t.city || 'Việt Nam',
-            duration: t.duration || (t.durationDays ? `${t.durationDays} Ngày` : '3N2Đ'),
-            durationDays: t.durationDays || 3,
-            basePrice: t.basePrice || t.price || 3500000,
-            imageUrl: t.imageUrl || SEED_TOURS[idx % SEED_TOURS.length].imageUrl,
-            rating: 4.9,
-            departures: (t.upcomingDepartures && t.upcomingDepartures.length > 0)
-              ? t.upcomingDepartures
-              : (t.departures || SEED_TOURS[idx % SEED_TOURS.length].departures),
-            hotelOption: SEED_TOURS[idx % SEED_TOURS.length].hotelOption,
-            itinerary: t.itinerary || SEED_TOURS[idx % SEED_TOURS.length].itinerary,
-          }));
+          const mapped = items.map((t, idx) => {
+            const rich = (RICH_TOURS_DATA && RICH_TOURS_DATA.find(r => r.id === t.id)) || (RICH_TOURS_DATA && RICH_TOURS_DATA[idx % RICH_TOURS_DATA.length]) || null;
+            return {
+              id: t.id,
+              name: t.title || t.name || rich?.name,
+              description: t.description || rich?.description || 'Khám phá hành trình di sản và thiên nhiên Việt Nam tuyệt đẹp cùng SmartTrip.',
+              destination: t.destinationName || t.destination || rich?.destination || t.city || 'Việt Nam',
+              city: t.city || rich?.city || 'Việt Nam',
+              duration: t.duration || (t.durationDays ? `${t.durationDays} Ngày ${Math.max(1, t.durationDays - 1)} Đêm` : (rich?.duration || '3N2Đ')),
+              durationDays: t.durationDays || rich?.durationDays || 3,
+              basePrice: t.basePrice || t.price || rich?.basePrice || 3500000,
+              imageUrl: t.imageUrl || rich?.images?.main || (SEED_TOURS[idx % SEED_TOURS.length] && SEED_TOURS[idx % SEED_TOURS.length].imageUrl),
+              rating: rich?.rating || 4.9,
+              departures: (t.upcomingDepartures && t.upcomingDepartures.length > 0)
+                ? t.upcomingDepartures
+                : (rich?.departures || t.departures),
+              hotelOption: rich?.hotelOption || (SEED_TOURS[idx % SEED_TOURS.length] && SEED_TOURS[idx % SEED_TOURS.length].hotelOption),
+              itinerary: rich?.itinerary || t.itinerary,
+            };
+          });
           setTours(mapped);
         }
       } catch (err) {
@@ -193,11 +198,9 @@ export const TourListPage = () => {
     setSortBy('DEFAULT');
   };
 
-  // Open tour detail modal
+  // Open tour detail page matching design
   const handleOpenDetail = (tour) => {
-    setSelectedTour(tour);
-    setSelectedDeparture(tour.departures?.[0] || null);
-    setIncludeHotel(Boolean(tour.hotelOption));
+    navigate('/tours/' + tour.id);
   };
 
   // Direct checkout action

@@ -34,7 +34,9 @@ public class RabbitMQConfig {
     @Bean
     @ConditionalOnMissingBean
     public MessageConverter jacksonMessageConverter(ObjectMapper messagingObjectMapper) {
-        return new Jackson2JsonMessageConverter(messagingObjectMapper);
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter(messagingObjectMapper);
+        converter.setAlwaysConvertToInferredType(true);
+        return converter;
     }
 
     @Bean

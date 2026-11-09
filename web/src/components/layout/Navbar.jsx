@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuthWallet } from '../../context/AuthWalletContext';
 import { AuthModal } from '../../features/auth/AuthModal';
+import { UserProfileModal } from '../../features/auth/UserProfileModal';
 
 export const Navbar = () => {
   const location = useLocation();
@@ -26,6 +27,7 @@ export const Navbar = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalTab, setAuthModalTab] = useState('login');
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const formatVND = (amount) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
@@ -171,6 +173,16 @@ export const Navbar = () => {
 
                     {/* Navigation inside user menu */}
                     <div className="py-1 border-b border-slate-100 text-xs">
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          setShowProfileModal(true);
+                        }}
+                        className="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-medium"
+                      >
+                        <UserCheck className="w-4 h-4 text-indigo-500" />
+                        <span>Hồ sơ cá nhân (User Profile)</span>
+                      </button>
                       <Link
                         to="/operator"
                         onClick={() => setShowUserMenu(false)}
@@ -247,6 +259,12 @@ export const Navbar = () => {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         initialTab={authModalTab}
+      />
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
       />
     </>
   );

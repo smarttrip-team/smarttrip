@@ -68,7 +68,10 @@ public class TourCommandHandler {
     }
 
     private void handleReserveTour(ReserveTourCommand cmd, String correlationId, String causationId) {
-        Optional<TourDeparture> depOpt = tourDepartureRepository.findById(cmd.getDepartureId());
+        Optional<TourDeparture> depOpt = tourDepartureRepository.findByIdForUpdate(cmd.getDepartureId());
+        if (depOpt.isEmpty()) {
+            depOpt = tourDepartureRepository.findById(cmd.getDepartureId());
+        }
         if (depOpt.isEmpty()) {
             publishReserveFailed(cmd, "Departure not found: " + cmd.getDepartureId(), correlationId, causationId);
             return;

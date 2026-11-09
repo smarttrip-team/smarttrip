@@ -38,4 +38,14 @@ public class TourOperatorController {
         DepartureResponse response = tourService.addDeparture(tourId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @PatchMapping("/departures/{departureId}/capacity")
+    @Operation(summary = "Update departure capacity")
+    public ResponseEntity<DepartureResponse> updateDepartureCapacity(
+            @PathVariable("departureId") Long departureId,
+            @RequestParam(name = "totalSeats", required = false) Integer totalSeats,
+            @RequestParam(name = "availableSeats", required = false) Integer availableSeats) {
+        DepartureResponse response = tourService.updateDepartureCapacity(departureId, totalSeats, availableSeats);
+        return ResponseEntity.ok(response);
+    }
 }

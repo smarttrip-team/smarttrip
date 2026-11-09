@@ -43,6 +43,12 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBookingByCode(bookingCode));
     }
 
+
+    @GetMapping({"/api/v1/bookings/sagas", "/api/v1/bookings/saga/all", "/api/v1/admin/sagas"})
+    public ResponseEntity<List<SagaStatusResponse>> getAllSagas() {
+        return ResponseEntity.ok(bookingService.getAllSagas());
+    }
+
     @GetMapping({"/api/v1/bookings/{bookingCode}/saga", "/api/bookings/{bookingCode}/saga"})
     public ResponseEntity<SagaStatusResponse> getSagaStatus(@PathVariable String bookingCode) {
         return ResponseEntity.ok(bookingService.getSagaStatusByBookingCode(bookingCode));

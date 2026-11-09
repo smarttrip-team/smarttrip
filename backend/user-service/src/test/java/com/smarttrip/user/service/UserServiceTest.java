@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -244,5 +245,24 @@ class UserServiceTest {
         assertNotNull(response);
         assertEquals("Nguyen Van B", response.getFullName());
         assertEquals("0999999999", response.getPhone());
+    }
+
+    @Test
+    void testGetAllUsers_Success() {
+        when(userRepository.findAll()).thenReturn(List.of(sampleUser));
+        List<UserResponse> list = userService.getAllUsers();
+        assertNotNull(list);
+        assertEquals(1, list.size());
+        assertEquals("test@smarttrip.com", list.get(0).getEmail());
+    }
+
+    @Test
+    void testUpdateUserStatus_Success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = userService.updateUserStatus(1L, "BLOCKED");
+        assertNotNull(response);
+        assertEquals("BLOCKED", response.getStatus());
     }
 }

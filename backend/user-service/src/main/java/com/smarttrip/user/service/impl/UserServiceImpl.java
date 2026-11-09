@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -175,6 +176,31 @@ public class UserServiceImpl implements UserService {
                 .map(user -> user.getRoles().stream()
                         .anyMatch(r -> r.getName().name().equalsIgnoreCase(roleName)))
                 .orElse(false);
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::toUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateUserStatus(Long userId, String status) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        try {
+            user.setStatus(UserStatus.valueOf(status.toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid status: " + status);
+        }
+
+        User saved = userRepository.save(user);
+        return toUserResponse(saved);
     }
 
     private UserResponse toUserResponse(User user) {

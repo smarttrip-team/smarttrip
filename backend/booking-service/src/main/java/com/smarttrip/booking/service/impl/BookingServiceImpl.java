@@ -17,6 +17,7 @@ import com.smarttrip.booking.service.BookingService;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -260,6 +261,55 @@ public class BookingServiceImpl implements BookingService {
                 .startedAt(saga.getStartedAt())
                 .completedAt(saga.getCompletedAt())
                 .build();
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SagaStatusResponse> getAllSagas() {
+        List<SagaInstance> sagas = sagaInstanceRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
+        List<SagaStatusResponse> responses = new ArrayList<>();
+        for (SagaInstance saga : sagas) {
+            String bookingCode = "UNKNOWN";
+            if (saga.getBookingId() != null) {
+                bookingCode = bookingRepository.findById(saga.getBookingId())
+                        .map(Booking::getBookingCode)
+                        .orElse("BK-" + saga.getBookingId());
+            }
+
+            List<SagaStep> steps = sagaStepRepository != null
+                    ? sagaStepRepository.findBySagaInstanceSagaId(saga.getSagaId())
+                    : saga.getSteps();
+
+            List<SagaStepResponse> stepResponses = new ArrayList<>();
+            if (steps != null) {
+                for (SagaStep s : steps) {
+                    stepResponses.add(SagaStepResponse.builder()
+                            .stepName(s.getStepName())
+                            .actionType(s.getActionType())
+                            .status(s.getStatus())
+                            .attemptCount(s.getAttemptCount())
+                            .lastError(s.getLastError())
+                            .startedAt(s.getStartedAt())
+                            .completedAt(s.getCompletedAt())
+                            .build());
+                }
+            }
+
+            responses.add(SagaStatusResponse.builder()
+                    .sagaId(saga.getSagaId())
+                    .bookingId(saga.getBookingId())
+                    .bookingCode(bookingCode)
+                    .sagaType(saga.getSagaType())
+                    .status(saga.getStatus())
+                    .currentStep(saga.getCurrentStep())
+                    .failureReason(saga.getFailureReason())
+                    .steps(stepResponses)
+                    .startedAt(saga.getStartedAt())
+                    .completedAt(saga.getCompletedAt())
+                    .build());
+        }
+        return responses;
     }
 
     private void validateCustomerStatus(Long customerId) {

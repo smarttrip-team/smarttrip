@@ -12,7 +12,9 @@ import com.smarttrip.booking.exception.BusinessException;
 import com.smarttrip.booking.exception.ResourceNotFoundException;
 import com.smarttrip.booking.exception.UserBlockedException;
 import com.smarttrip.booking.repository.BookingRepository;
+import com.smarttrip.booking.entity.SagaStep;
 import com.smarttrip.booking.repository.SagaInstanceRepository;
+import com.smarttrip.booking.repository.SagaStepRepository;
 import com.smarttrip.booking.saga.BookingSagaOrchestrator;
 import com.smarttrip.booking.service.impl.BookingServiceImpl;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +52,9 @@ class BookingServiceTest {
 
     @Mock
     private BookingSagaOrchestrator sagaOrchestrator;
+
+    @Mock
+    private SagaStepRepository sagaStepRepository;
 
     @InjectMocks
     private BookingServiceImpl bookingService;
@@ -359,5 +364,44 @@ class BookingServiceTest {
         assertThatThrownBy(() -> bookingService.cancelBooking("BK-CANCEL-1", 10L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Only CONFIRMED bookings can be cancelled");
+    }
+
+    @Test
+    @DisplayName("Should retrieve Saga status and steps by booking code")
+    void getSagaStatusByBookingCode_success() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .bookingCode("BK-SAGA-1")
+                .status("CONFIRMED")
+                .build();
+
+        SagaInstance saga = SagaInstance.builder()
+                .id(10L)
+                .sagaId("saga-123")
+                .bookingId(1L)
+                .sagaType("BOOKING_CREATE")
+                .status("COMPLETED")
+                .currentStep("COMPLETED")
+                .build();
+
+        SagaStep step = SagaStep.builder()
+                .id(100L)
+                .sagaInstance(saga)
+                .stepName("RESERVE_TOUR")
+                .actionType("COMMAND")
+                .status("COMPLETED")
+                .build();
+
+        when(bookingRepository.findByBookingCode("BK-SAGA-1")).thenReturn(Optional.of(booking));
+        when(sagaInstanceRepository.findByBookingId(1L)).thenReturn(Optional.of(saga));
+        when(sagaStepRepository.findBySagaInstanceSagaId("saga-123")).thenReturn(List.of(step));
+
+        SagaStatusResponse response = bookingService.getSagaStatusByBookingCode("BK-SAGA-1");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getSagaId()).isEqualTo("saga-123");
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
+        assertThat(response.getSteps()).hasSize(1);
+        assertThat(response.getSteps().get(0).getStepName()).isEqualTo("RESERVE_TOUR");
     }
 }

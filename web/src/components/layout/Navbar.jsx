@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthWallet, PRESET_USERS } from '../../context/AuthWalletContext';
 import {
   Compass,
@@ -27,6 +27,14 @@ import { AuthModal } from '../../features/auth/AuthModal';
 import { UserProfileModal } from '../../features/auth/UserProfileModal';
 
 export default function Navbar() {
+  const navigate = useNavigate();
+
+  const getHomeLink = () => {
+    if (currentRole === 'ROLE_TOUR_OPERATOR') return '/operator';
+    if (currentRole === 'ROLE_HOTEL_MANAGER') return '/hotel-manager';
+    if (currentRole === 'ROLE_ADMIN') return '/admin/sagas';
+    return '/tours';
+  };
   const { 
     token,
     currentUserId, 
@@ -110,7 +118,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16">
             {/* Left: Logo & Dynamic Menus */}
             <div className="flex items-center gap-8">
-              <Link to="/" className="flex items-center gap-2.5 group">
+              <Link to={getHomeLink()} className="flex items-center gap-2.5 group">
                 <div className="w-10 h-10 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-md shadow-sky-200 group-hover:scale-105 transition-transform">
                   <Compass className="w-5 h-5" />
                 </div>
@@ -124,80 +132,100 @@ export default function Navbar() {
                 </div>
               </Link>
 
-              {/* Core Navigation Links (Consolidated & Streamlined) */}
+              {/* Core Navigation Links (Role-specific & Strictly Scoped) */}
               <nav className="hidden md:flex items-center gap-6 text-sm">
-                <Link
-                  to="/tours"
-                  className={`py-5 ${
-                    location.pathname === '/' || location.pathname === '/tours' || location.pathname.startsWith('/tours/')
-                      ? 'text-sky-600 font-bold border-b-2 border-sky-600'
-                      : 'text-slate-700 hover:text-sky-600 font-medium transition-colors'
-                  }`}
-                >
-                  Khám phá Tour
-                </Link>
-
-                {/* Customer Bookings & Wallet Links */}
-                {currentRole === 'ROLE_CUSTOMER' && (
+                {/* 1. KHÁCH HÀNG / GUEST: Chỉ hiển thị Khám phá Tour, Đơn đặt chỗ, Ví */}
+                {(!isAuthenticated || currentRole === 'ROLE_CUSTOMER') && (
                   <>
-                    <Link to="/bookings" className={`py-5 flex items-center gap-1.5 ${isActive('/bookings')}`}>
-                      <CalendarCheck className="w-4 h-4 text-sky-500" />
-                      Đơn đặt chỗ
+                    <Link
+                      to="/tours"
+                      className={`py-5 ${
+                        location.pathname === '/' || location.pathname === '/tours' || location.pathname.startsWith('/tours/')
+                          ? 'text-sky-600 font-bold border-b-2 border-sky-600'
+                          : 'text-slate-700 hover:text-sky-600 font-medium transition-colors'
+                      }`}
+                    >
+                      Khám phá Tour
                     </Link>
-                    <Link to="/wallet" className={`py-5 flex items-center gap-1.5 ${isActive('/wallet')}`}>
-                      <Wallet className="w-4 h-4 text-emerald-500" />
-                      Ví SmartTrip
-                    </Link>
+
+                    {isAuthenticated && (
+                      <>
+                        <Link to="/bookings" className={`py-5 flex items-center gap-1.5 ${isActive('/bookings')}`}>
+                          <CalendarCheck className="w-4 h-4 text-sky-500" />
+                          <span>Đơn đặt chỗ</span>
+                        </Link>
+                        <Link to="/wallet" className={`py-5 flex items-center gap-1.5 ${isActive('/wallet')}`}>
+                          <Wallet className="w-4 h-4 text-emerald-500" />
+                          <span>Ví SmartTrip</span>
+                        </Link>
+                      </>
+                    )}
                   </>
                 )}
 
-                {/* Operator Links */}
-                {(currentRole === 'ROLE_TOUR_OPERATOR' || currentRole === 'ROLE_ADMIN') && (
+                {/* 2. TOUR OPERATOR: Chỉ tập trung quản trị Tour & Lịch khởi hành, không hiển thị trang đặt tour */}
+                {currentRole === 'ROLE_TOUR_OPERATOR' && (
                   <Link to="/operator" className={`py-5 flex items-center gap-1.5 ${isActive('/operator')}`}>
                     <Layers className="w-4 h-4 text-amber-500" />
-                    Quản lý Tour
+                    <span className="font-bold text-amber-700">Quản lý Tour & Lịch Khởi Hành</span>
                   </Link>
                 )}
 
-                {/* Hotel Manager Links */}
-                {(currentRole === 'ROLE_HOTEL_MANAGER' || currentRole === 'ROLE_ADMIN') && (
+                {/* 3. HOTEL MANAGER: Chỉ tập trung quản trị Phòng khách sạn */}
+                {currentRole === 'ROLE_HOTEL_MANAGER' && (
                   <Link to="/hotel-manager" className={`py-5 flex items-center gap-1.5 ${isActive('/hotel-manager')}`}>
                     <Building2 className="w-4 h-4 text-emerald-500" />
-                    Quản lý Khách sạn
+                    <span className="font-bold text-emerald-700">Quản lý Khách sạn & Phòng</span>
                   </Link>
                 )}
 
-                {/* Admin Links */}
+                {/* 4. ADMIN: Trung tâm điều phối hệ thống phân tán */}
                 {currentRole === 'ROLE_ADMIN' && (
-                  <Link to="/admin/sagas" className={`py-5 flex items-center gap-1.5 ${isActive('/admin/sagas')}`}>
-                    <Activity className="w-4 h-4 text-rose-500 animate-pulse" />
-                    <span className="font-semibold text-rose-600">Saga Visualizer</span>
-                  </Link>
+                  <>
+                    <Link to="/admin" className={`py-5 flex items-center gap-1.5 ${isActive('/admin')}`}>
+                      <ShieldCheck className="w-4 h-4 text-rose-500" />
+                      <span>Dashboard Quản Trị</span>
+                    </Link>
+                    <Link to="/admin/sagas" className={`py-5 flex items-center gap-1.5 ${isActive('/admin/sagas')}`}>
+                      <Activity className="w-4 h-4 text-rose-500 animate-pulse" />
+                      <span className="font-semibold text-rose-600">Saga Visualizer</span>
+                    </Link>
+                    <Link to="/operator" className={`py-5 flex items-center gap-1.5 ${isActive('/operator')}`}>
+                      <Layers className="w-4 h-4 text-amber-500" />
+                      <span>Duyệt Tour</span>
+                    </Link>
+                    <Link to="/hotel-manager" className={`py-5 flex items-center gap-1.5 ${isActive('/hotel-manager')}`}>
+                      <Building2 className="w-4 h-4 text-emerald-500" />
+                      <span>Duyệt Khách Sạn</span>
+                    </Link>
+                  </>
                 )}
               </nav>
             </div>
 
             {/* Right Header: Search, Auth & User Actions */}
             <div className="flex items-center gap-3">
-              {/* Search Icon */}
-              <button
-                type="button"
-                onClick={() => {
-                  const searchEl = document.getElementById('tour-search-input');
-                  if (searchEl) {
-                    searchEl.focus();
-                  } else {
-                    window.location.href = '/tours';
-                  }
-                }}
-                className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors"
-                title="Tìm kiếm tour"
-              >
-                <Search className="w-4 h-4" />
-              </button>
+              {/* Search Icon (Only for Customer / Guest) */}
+              {(!isAuthenticated || currentRole === 'ROLE_CUSTOMER') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const searchEl = document.getElementById('tour-search-input');
+                    if (searchEl) {
+                      searchEl.focus();
+                    } else {
+                      window.location.href = '/tours';
+                    }
+                  }}
+                  className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors"
+                  title="Tìm kiếm tour"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              )}
 
-              {/* If Authenticated: Show Wallet Pill */}
-              {isAuthenticated && (
+              {/* If Authenticated Customer: Show Wallet Pill */}
+              {isAuthenticated && currentRole === 'ROLE_CUSTOMER' && (
                 <Link
                   to="/wallet"
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 transition-colors shadow-xs"
@@ -327,6 +355,10 @@ export default function Navbar() {
                               onClick={() => {
                                 switchUser(user);
                                 setDropdownOpen(false);
+                                if (user.role === 'ROLE_TOUR_OPERATOR') navigate('/operator');
+                                else if (user.role === 'ROLE_HOTEL_MANAGER') navigate('/hotel-manager');
+                                else if (user.role === 'ROLE_ADMIN') navigate('/admin/sagas');
+                                else navigate('/tours');
                               }}
                               className={`w-full text-left px-4 py-2 flex items-center justify-between hover:bg-sky-50 transition-colors ${
                                 currentUserId === user.id ? 'bg-sky-50/70 font-bold text-sky-700' : 'text-slate-700'

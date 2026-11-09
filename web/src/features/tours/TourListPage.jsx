@@ -234,9 +234,7 @@ export const TourListPage = () => {
         <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
         
         <div className="max-w-5xl mx-auto relative z-10 text-center space-y-6">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5" /> Nền Tảng Đặt Tour Phân Tán • Issue #17 & #41
-          </span>
+          
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
             Khám Phá Việt Nam Cùng <span className="bg-gradient-to-r from-indigo-400 to-indigo-200 bg-clip-text text-transparent">SmartTrip</span>
           </h1>

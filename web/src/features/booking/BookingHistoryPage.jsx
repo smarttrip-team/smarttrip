@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { History, Calendar, Users, Hotel, ArrowRight, RefreshCw, XCircle, CheckCircle2, AlertTriangle, Clock, Wallet } from 'lucide-react';
+import { History, Calendar, Users, Hotel, ArrowRight, RefreshCw, XCircle, CheckCircle2, AlertTriangle, Clock, Wallet, ShieldCheck, Sparkles } from 'lucide-react';
 import { useAuthWallet } from '../../context/AuthWalletContext';
 import { bookingApi } from '../../services/api';
 
@@ -38,7 +38,7 @@ export const BookingHistoryPage = () => {
   }, [currentUserId]);
 
   const handleCancel = async (bookingCode) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn hàng ${bookingCode}? Tiền sẽ được hoàn lại ngay vào ví điện tử của bạn.`)) {
+    if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn hàng ${bookingCode}? Tiền sẽ được hoàn lại ngay vào ví điện tử của bạn theo quy trình Saga.`)) {
       return;
     }
 
@@ -103,6 +103,40 @@ export const BookingHistoryPage = () => {
         </button>
       </div>
 
+      {/* Cancellation Saga Policy Info Card */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-md border border-slate-800">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                SAGA CANCELLATION & REFUND
+              </span>
+              <span className="text-xs text-slate-300 font-semibold">Chính sách hủy tour & hoàn tiền tự động (Issue #16)</span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Khi khách hàng nhấn "Hủy tour", Saga Orchestrator sẽ tự động điều phối trả ghế tour, hoàn phòng khách sạn và hoàn tiền tức thì vào Ví SmartTrip.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-xs bg-white/5 px-4 py-2 rounded-xl border border-white/5 flex-shrink-0">
+            <div className="text-center">
+              <span className="text-[10px] text-slate-400 block">&ge; 7 Ngày trước đi</span>
+              <span className="font-bold text-emerald-400">Hoàn 100%</span>
+            </div>
+            <div className="w-px h-6 bg-slate-700" />
+            <div className="text-center">
+              <span className="text-[10px] text-slate-400 block">3 - 6 Ngày trước đi</span>
+              <span className="font-bold text-amber-400">Hoàn 50%</span>
+            </div>
+            <div className="w-px h-6 bg-slate-700" />
+            <div className="text-center">
+              <span className="text-[10px] text-slate-400 block">&lt; 3 Ngày trước đi</span>
+              <span className="font-bold text-rose-400">Không hoàn</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto text-xs font-semibold">
         {['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED', 'FAILED'].map((st) => (
@@ -123,50 +157,56 @@ export const BookingHistoryPage = () => {
       {/* Bookings List */}
       {loading ? (
         <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-2">
-          <RefreshCw className="w-8 h-8 animate-spin text-indigo-600" />
-          <p className="text-sm font-medium">Đang tải danh sách đặt tour...</p>
+          <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
+          <span>Đang tải danh sách đơn đặt chỗ...</span>
         </div>
       ) : filteredBookings.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 space-y-4">
-          <History className="w-12 h-12 text-slate-300 mx-auto" />
-          <div>
-            <h3 className="text-base font-bold text-slate-800">Không có đơn đặt chỗ nào</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Bạn chưa thực hiện đơn đặt tour nào với trạng thái này.
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+            <History className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-slate-800">Không tìm thấy đơn hàng nào</h3>
+            <p className="text-sm text-slate-500">
+              {filterStatus === 'ALL'
+                ? `Tài khoản #${currentUserId} (${currentUserName}) chưa có đơn đặt tour nào trên hệ thống.`
+                : `Không có đơn hàng nào ở trạng thái ${filterStatus}.`}
             </p>
           </div>
           <Link
             to="/"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md shadow-indigo-100 transition-colors"
           >
-            Khám phá & Đặt Tour ngay &rarr;
+            Khám phá tour ngay
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       ) : (
         <div className="space-y-4">
           {filteredBookings.map((b) => {
-            const hasHotel = b.hotelDetails && b.hotelDetails.length > 0;
             const isConfirmed = b.status?.toUpperCase() === 'CONFIRMED';
             const isCancelled = b.status?.toUpperCase() === 'CANCELLED';
+            const hasHotel = b.hotelDetails && b.hotelDetails.length > 0;
 
             return (
               <div
-                key={b.id || b.bookingCode}
-                className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4"
+                key={b.bookingCode || b.id}
+                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-slate-300 transition-all space-y-4"
               >
                 {/* Header row */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
+                    <span className="font-mono font-bold text-sm text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
                       {b.bookingCode}
                     </span>
+                    {getStatusBadge(b.status)}
                     <span className="text-xs text-slate-400">
-                      {b.createdAt ? new Date(b.createdAt).toLocaleString('vi-VN') : 'Mới tạo'}
+                      Tạo lúc: {b.createdAt ? new Date(b.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {getStatusBadge(b.status)}
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400 block">Tổng thanh toán</span>
                     <span className="text-lg font-bold text-indigo-700">{formatVND(b.totalAmount)}</span>
                   </div>
                 </div>

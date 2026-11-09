@@ -88,6 +88,7 @@ export default function SagaVisualizerPage() {
   // Calculate statistics
   const totalCount = sagas.length;
   const completedCount = sagas.filter((s) => s.status === 'COMPLETED').length;
+  const compensatedCount = sagas.filter((s) => s.status === 'COMPENSATED').length;
   const failedCount = sagas.filter((s) => s.status === 'FAILED' || s.status === 'COMPENSATED').length;
   const inProgressCount = sagas.filter((s) => s.status === 'STARTED' || s.status === 'PROCESSING' || s.status === 'COMPENSATING').length;
   const successRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
@@ -99,7 +100,9 @@ export default function SagaVisualizerPage() {
       matchStatus = s.status === 'COMPLETED';
     } else if (filterStatus === 'PROCESSING' || filterStatus === 'STARTED') {
       matchStatus = s.status === 'PROCESSING' || s.status === 'STARTED' || s.status === 'COMPENSATING';
-    } else if (filterStatus === 'FAILED' || filterStatus === 'COMPENSATED') {
+    } else if (filterStatus === 'COMPENSATED') {
+      matchStatus = s.status === 'COMPENSATED';
+    } else if (filterStatus === 'FAILED') {
       matchStatus = s.status === 'FAILED' || s.status === 'COMPENSATED';
     } else if (filterStatus !== 'ALL') {
       matchStatus = s.status === filterStatus;
@@ -111,6 +114,17 @@ export default function SagaVisualizerPage() {
       s.bookingCode?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchStatus && matchSearch;
   });
+
+  // Synchronize selectedSaga with filteredSagas to avoid showing stale detail cards
+  useEffect(() => {
+    if (filteredSagas.length > 0) {
+      if (!selectedSaga || !filteredSagas.some((s) => s.sagaId === selectedSaga.sagaId)) {
+        setSelectedSaga(filteredSagas[0]);
+      }
+    } else {
+      setSelectedSaga(null);
+    }
+  }, [filterStatus, searchQuery, sagas]);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -294,10 +308,11 @@ export default function SagaVisualizerPage() {
                 {/* Filter Pills */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {[
-                    { key: 'ALL', label: 'ALL', count: totalCount },
+                    { key: 'ALL', label: 'TẤT CẢ (ALL)', count: totalCount },
                     { key: 'COMPLETED', label: 'COMPLETED', count: completedCount },
                     { key: 'PROCESSING', label: 'PROCESSING', count: inProgressCount },
-                    { key: 'FAILED', label: 'FAILED / COMPENSATED', count: failedCount },
+                    { key: 'COMPENSATED', label: 'COMPENSATED', count: compensatedCount },
+                    { key: 'FAILED', label: 'FAILED', count: failedCount },
                   ].map((tab) => (
                     <button
                       key={tab.key}

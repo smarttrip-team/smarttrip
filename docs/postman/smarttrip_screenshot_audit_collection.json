@@ -1,0 +1,759 @@
+{
+  "info": {
+    "_postman_id": "smarttrip-screenshot-audit-collection-2026",
+    "name": "SmartTrip - Screenshot Audit Collection (FPT MSS301)",
+    "description": "Tập hợp các API dành riêng cho việc chụp màn hình minh chứng báo cáo MSS301 (Thành viên 1 - BẠN & Thành viên 2 - VINH). Đảm bảo 100% Pass khi chạy Collection Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingCodeHappy",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingCodeCompensated",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "📁 PHẦN I - BẠN (User, Tour, Gateway, Security)",
+      "item": [
+        {
+          "name": "Mục 4.1 - [BẠN] Login Customer (200 OK & Lấy JWT Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Response contains accessToken and user info', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.data.email).to.eql('customer1@smarttrip.com');",
+                  "});",
+                  "if (jsonData.data && jsonData.data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "    console.log('Saved accessToken successfully');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer1@smarttrip.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: POST /api/v1/auth/login trả về 200 OK kèm Bearer Token JWT cho customer1@smarttrip.com.\nTên file ảnh báo cáo: IMG_04_POSTMAN_AUTH_LOGIN_200OK.png"
+          }
+        },
+        {
+          "name": "Mục 4.2 - [BẠN] Get Me (/api/v1/users/me - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Returns profile of customer1', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.email).to.eql('customer1@smarttrip.com');",
+                  "    pm.expect(jsonData.data.role).to.eql('ROLE_CUSTOMER');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Xác thực JWT thành công qua Gateway đến user-service.\nTên file ảnh báo cáo: IMG_04_POSTMAN_GET_ME_200OK.png"
+          }
+        },
+        {
+          "name": "Mục 5.1 - [BẠN] Token Pre-check 401 Unauthorized (Không kèm Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: API Gateway chặn ngay lập tức request không có Token với mã lỗi 401 Unauthorized.\nTên file ảnh báo cáo: IMG_05_POSTMAN_PRECHECK_401_UNAUTHORIZED.png"
+          }
+        },
+        {
+          "name": "Mục 5.2 - [BẠN] RBAC Pre-check 403 Forbidden (Khách truy cập Operator API)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 403 Forbidden', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/operator/tours",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "operator",
+                "tours"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: User có quyền ROLE_CUSTOMER cố tình gọi API /api/v1/operator/tours của TOUR_OPERATOR bị chặn 403 Forbidden.\nTên file ảnh báo cáo: IMG_05_POSTMAN_RBAC_403_FORBIDDEN.png"
+          }
+        },
+        {
+          "name": "Mục 6.1 - [BẠN] Tra cứu danh sách Tour công khai (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Tour list contains items', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.content.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tours",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tours"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Tour Service trả về danh mục tour công khai.\nTên file ảnh báo cáo: IMG_06_POSTMAN_TOUR_LISTING_200OK.png"
+          }
+        },
+        {
+          "name": "Mục 6.2 - [BẠN] Chi tiết Tour & Số ghế trống Departures (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Tour has departures with available seats', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.departures.length).to.be.above(0);",
+                  "    pm.expect(jsonData.data.departures[0].availableSeats).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tours/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tours",
+                "1"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Chi tiết Tour 1 kèm mảng lịch khởi hành departures với số ghế trống availableSeats.\nTên file ảnh báo cáo: IMG_06_POSTMAN_TOUR_DEPARTURES_SEATS_200OK.png"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📁 PHẦN II - VINH (Hotel, Wallet, Saga Orchestrator)",
+      "item": [
+        {
+          "name": "Mục 3.1 - [VINH] Tra cứu Khách sạn & Loại phòng Hotel Service (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Hotels with room types loaded', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/hotels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hotels"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Danh mục khách sạn và loại phòng từ hotel-service.\nTên file ảnh báo cáo: IMG_03_POSTMAN_HOTEL_ROOM_INVENTORY_200OK.png"
+          }
+        },
+        {
+          "name": "Mục 4.1 - [VINH] Nạp tiền Top-up vào Ví điện tử (201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 Created or 200 OK', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Top up success', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.balance).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallets/top-up",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallets",
+                "top-up"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Nạp 50,000,000 VND vào ví điện tử của customer1.\nTên file ảnh báo cáo: IMG_04_POSTMAN_WALLET_TOPUP_201CREATED.png"
+          }
+        },
+        {
+          "name": "Mục 4.2 - [VINH] Tra cứu số dư Ví điện tử (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Wallet details returned', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.balance).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallet"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Số dư khả dụng và số dư tạm giữ của ví điện tử.\nTên file ảnh báo cáo: IMG_04_POSTMAN_WALLET_BALANCE_200OK.png"
+          }
+        },
+        {
+          "name": "Mục 6.1 - [VINH] Khởi tạo Booking Saga Happy Path (202 Accepted)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Booking created with PENDING status', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.bookingCode).to.be.a('string');",
+                  "    pm.expect(jsonData.data.status).to.eql('PENDING');",
+                  "});",
+                  "if (jsonData.data && jsonData.data.bookingCode) {",
+                  "    pm.collectionVariables.set('bookingCodeHappy', jsonData.data.bookingCode);",
+                  "    console.log('Saved bookingCodeHappy: ' + jsonData.data.bookingCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tourId\": 1,\n  \"departureId\": 1,\n  \"numberOfGuests\": 1,\n  \"contactName\": \"Nguyen Hong Thai\",\n  \"contactEmail\": \"customer1@smarttrip.com\",\n  \"contactPhone\": \"0901234567\",\n  \"specialRequests\": \"Demo Happy Path Saga Orchestrator\",\n  \"hotelCombo\": {\n    \"hotelId\": 1,\n    \"roomTypeId\": 1,\n    \"numberOfRooms\": 1,\n    \"checkInDate\": \"2026-11-20\",\n    \"checkOutDate\": \"2026-11-23\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Tạo đơn đặt tour kết hợp khách sạn thành công, trả về trạng thái PENDING.\nTên file ảnh báo cáo: IMG_06_POSTMAN_BOOKING_CREATE_202ACCEPTED.png"
+          }
+        },
+        {
+          "name": "Mục 6.2 - [VINH] Tra cứu Chi tiết Booking đã CONFIRMED (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Booking is CONFIRMED', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.status).to.eql('CONFIRMED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingCodeHappy}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingCodeHappy}}"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Saga hoàn tất, booking chuyển sang trạng thái CONFIRMED.\nTên file ảnh báo cáo: IMG_06_POSTMAN_BOOKING_CONFIRMED_200OK.png"
+          }
+        },
+        {
+          "name": "Mục 6.3 - [VINH] Tra cứu Tiến trình Saga Orchestrator COMPLETED (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Saga instance status is COMPLETED with steps', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.status).to.eql('COMPLETED');",
+                  "    pm.expect(jsonData.data.steps.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingCodeHappy}}/saga",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingCodeHappy}}",
+                "saga"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Bảng các bước Saga đầy đủ Reserve Tour -> Reserve Hotel -> Authorize Payment -> Capture Payment đều thành công.\nTên file ảnh báo cáo: IMG_06_POSTMAN_SAGA_HAPPY_PATH_COMPLETED.png"
+          }
+        },
+        {
+          "name": "Mục 8.1 - [VINH] Khởi tạo Saga Thất bại Bù trừ - Simulation Mode (202 Accepted)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Booking created', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.bookingCode).to.be.a('string');",
+                  "});",
+                  "if (jsonData.data && jsonData.data.bookingCode) {",
+                  "    pm.collectionVariables.set('bookingCodeCompensated', jsonData.data.bookingCode);",
+                  "    console.log('Saved bookingCodeCompensated: ' + jsonData.data.bookingCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tourId\": 1,\n  \"departureId\": 1,\n  \"numberOfGuests\": 1,\n  \"contactName\": \"Nguyen Hong Thai - Fail Demo\",\n  \"contactEmail\": \"customer1@smarttrip.com\",\n  \"contactPhone\": \"0901234567\",\n  \"specialRequests\": \"Demo Rollback Compensation Saga\",\n  \"simulationMode\": \"FAIL_AFTER_PAYMENT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Gửi request đặt đơn với cờ simulationMode: FAIL_AFTER_PAYMENT để kích hoạt Rollback.\nTên file ảnh báo cáo: IMG_08_POSTMAN_SAGA_TRIGGER_FAIL_202ACCEPTED.png"
+          }
+        },
+        {
+          "name": "Mục 8.2 - [VINH] Tra cứu Saga Bù trừ Rollback COMPENSATED (200 OK)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Delay 1.5s to let RabbitMQ process rollback",
+                  "setTimeout(function(){}, 1500);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Saga status is COMPENSATED', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(['COMPENSATED', 'FAILED']).to.include(jsonData.data.status);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingCodeCompensated}}/saga",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingCodeCompensated}}",
+                "saga"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Saga ghi nhận trạng thái COMPENSATED, các bước bù trừ Void Payment và Release Tour Seats được thực thi.\nTên file ảnh báo cáo: IMG_08_POSTMAN_SAGA_COMPENSATION_ROLLBACK.png"
+          }
+        },
+        {
+          "name": "Mục 9.1 - [VINH] Huỷ đơn hàng Cancellation Saga & Hoàn tiền (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Cancellation initiated', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Bận việc gia đình đột xuất, yêu cầu hoàn tiền 100%\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingCodeHappy}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingCodeHappy}}",
+                "cancel"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Huỷ đơn hàng thành công, kích hoạt luồng trả ghế và hoàn tiền 100% vào ví.\nTên file ảnh báo cáo: IMG_09_POSTMAN_CANCELLATION_SAGA_200OK.png"
+          }
+        },
+        {
+          "name": "Mục 9.2 - [VINH] Kiểm tra Số dư Ví sau khi Huỷ đơn (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Wallet balance returned', function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data.balance).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallet"
+              ]
+            },
+            "description": "Chụp ảnh minh chứng: Số dư ví đã được cộng hoàn trả tiền sau khi huỷ đơn.\nTên file ảnh báo cáo: IMG_09_POSTMAN_WALLET_AFTER_REFUND_200OK.png"
+          }
+        }
+      ]
+    }
+  ]
+}

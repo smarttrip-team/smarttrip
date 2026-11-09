@@ -392,6 +392,7 @@ export default function Navbar() {
                             onClick={() => {
                               logout();
                               setDropdownOpen(false);
+                              navigate('/tours');
                             }}
                             className="w-full text-left flex items-center gap-2 px-3 py-1.5 hover:bg-rose-50 text-rose-600 rounded-lg font-medium"
                           >

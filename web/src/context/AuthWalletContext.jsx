@@ -158,11 +158,21 @@ export const AuthWalletProvider = ({ children }) => {
     }
   };
 
-  // Logout handler
+  // Logout handler - Completely clear all user credentials & role
   const logout = () => {
     setToken(null);
+    setCurrentUserId(null);
+    setCurrentUserName('');
+    setCurrentUserEmail('');
+    setCurrentRole('ROLE_CUSTOMER');
+    setRoles([]);
     localStorage.removeItem('smarttrip_token');
-    showToast('Đã đăng xuất khỏi tài khoản', 'info');
+    localStorage.removeItem('smarttrip_user_id');
+    localStorage.removeItem('smarttrip_user_name');
+    localStorage.removeItem('smarttrip_user_email');
+    localStorage.removeItem('smarttrip_user_role');
+    localStorage.removeItem('smarttrip_roles');
+    showToast('Đã đăng xuất khỏi tài khoản thành công', 'info');
   };
 
   // Flexible user / role switcher (supports both object and separate args)

@@ -55,24 +55,36 @@ export const PRESET_USERS = [
 ];
 
 export const AuthWalletProvider = ({ children }) => {
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem('smarttrip_token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGFpQGdtYWlsLmNvbSIsInVzZXJJZCI6NSwicm9sZXMiOlsiUk9MRV9DVVNUT01FUiJdLCJpYXQiOjE3OTQzNDIzMTIsImV4cCI6MTgyNTg3ODMxMn0._uFYv3Xb5ikZ0On-EI-74H6up0HGKbg-Hl6MUM0F514';
-  });
-
-  const [currentUserId, setCurrentUserId] = useState(() => {
-    return Number(localStorage.getItem('smarttrip_user_id')) || 5;
-  });
-
-  const [currentUserName, setCurrentUserName] = useState(() => {
-    return localStorage.getItem('smarttrip_user_name') || 'Nguyễn Hồng Thái';
-  });
-
   const [currentUserEmail, setCurrentUserEmail] = useState(() => {
     return localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
   });
 
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched) return matched.id;
+    return Number(localStorage.getItem('smarttrip_user_id')) || 5;
+  });
+
+  const [currentUserName, setCurrentUserName] = useState(() => {
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched) return matched.name;
+    return localStorage.getItem('smarttrip_user_name') || 'Nguyễn Hồng Thái';
+  });
+
   const [currentRole, setCurrentRole] = useState(() => {
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched) return matched.role;
     return localStorage.getItem('smarttrip_user_role') || 'ROLE_CUSTOMER';
+  });
+
+  const [token, setToken] = useState(() => {
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched && matched.token) return matched.token;
+    return localStorage.getItem('smarttrip_token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGFpQGdtYWlsLmNvbSIsInVzZXJJZCI6NSwicm9sZXMiOlsiUk9MRV9DVVNUT01FUiJdLCJpYXQiOjE3OTQzNDIzMTIsImV4cCI6MTgyNTg3ODMxMn0._uFYv3Xb5ikZ0On-EI-74H6up0HGKbg-Hl6MUM0F514';
   });
 
   const [roles, setRoles] = useState(() => {
@@ -119,6 +131,31 @@ export const AuthWalletProvider = ({ children }) => {
       setLoadingWallet(false);
     }
   }, [currentUserId]);
+
+  // Auto-heal and keep user ID / token strictly in sync with PRESET_USERS
+  useEffect(() => {
+    const matched = PRESET_USERS.find((u) => u.email === currentUserEmail);
+    if (matched) {
+      if (currentUserId !== matched.id) {
+        setCurrentUserId(matched.id);
+        localStorage.setItem('smarttrip_user_id', String(matched.id));
+      }
+      if (token !== matched.token) {
+        setToken(matched.token);
+        localStorage.setItem('smarttrip_token', matched.token);
+      }
+      if (currentUserName !== matched.name) {
+        setCurrentUserName(matched.name);
+        localStorage.setItem('smarttrip_user_name', matched.name);
+      }
+      if (currentRole !== matched.role) {
+        setCurrentRole(matched.role);
+        setRoles([matched.role]);
+        localStorage.setItem('smarttrip_user_role', matched.role);
+        localStorage.setItem('smarttrip_roles', JSON.stringify([matched.role]));
+      }
+    }
+  }, [currentUserEmail, currentUserId, token, currentUserName, currentRole]);
 
   useEffect(() => {
     localStorage.setItem('smarttrip_user_id', String(currentUserId));

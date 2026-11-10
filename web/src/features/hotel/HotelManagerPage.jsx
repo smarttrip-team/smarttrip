@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { hotelApi, hotelManagerApi } from '../../services/api';
+import { hotelApi, hotelManagerApi, walletApi } from '../../services/api';
 import { useAuthWallet } from '../../context/AuthWalletContext';
 import {
   Building2,
   Wallet,
   ArrowUpRight,
+  ChevronRight,
   Calendar,
   BedDouble,
   DollarSign,
@@ -20,7 +21,33 @@ import {
 } from 'lucide-react';
 
 export default function HotelManagerPage() {
-  const { showToast, wallet } = useAuthWallet();
+  const { showToast, wallet, currentUserId } = useAuthWallet();
+
+  // Inline Settlement Ledger View
+  const [showSettlementLedger, setShowSettlementLedger] = useState(false);
+  const [settlementTransactions, setSettlementTransactions] = useState([]);
+  const [loadingSettlement, setLoadingSettlement] = useState(false);
+
+  const fetchSettlementTransactions = useCallback(async () => {
+    setLoadingSettlement(true);
+    try {
+      const res = await walletApi.getTransactions(currentUserId);
+      if (res?.data) {
+        setSettlementTransactions(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not load settlements:', err);
+    } finally {
+      setLoadingSettlement(false);
+    }
+  }, [currentUserId]);
+
+  const toggleSettlementLedger = () => {
+    if (!showSettlementLedger) {
+      fetchSettlementTransactions();
+    }
+    setShowSettlementLedger(!showSettlementLedger);
+  };
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -150,16 +177,109 @@ export default function HotelManagerPage() {
                 Doanh thu tiền phòng thực nhận 90% được hệ thống tự động quyết toán vào ví ngay khi khách đặt phòng
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={toggleSettlementLedger}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-900/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-400/30 font-semibold text-xs rounded-xl shadow-xs transition-colors"
+              >
+                <span>{showSettlementLedger ? 'Ẩn Bảng Sao Kê' : 'Xem Sao Kê Tại Đây'}</span>
+                <ChevronRight className={`w-3.5 h-3.5 transform transition-transform ${showSettlementLedger ? 'rotate-90' : ''}`} />
+              </button>
+
               <Link
                 to="/wallet"
-                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors"
               >
-                <span>Xem Sao Kê Ví</span>
+                <span>Mở Trang Ví & Rút Tiền</span>
                 <ArrowUpRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
+
+          {/* Inline Expandable Settlement Table */}
+          {showSettlementLedger && (
+            <div className="mt-5 pt-4 border-t border-emerald-500/20 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-emerald-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Lịch sử quyết toán tiền phòng lưu trú 90% (Khấu trừ 10% hoa hồng sàn)
+                </span>
+                <button
+                  type="button"
+                  onClick={fetchSettlementTransactions}
+                  disabled={loadingSettlement}
+                  className="text-xs text-emerald-300 hover:text-white flex items-center gap-1"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loadingSettlement ? 'animate-spin' : ''}`} />
+                  Làm mới
+                </button>
+              </div>
+
+              {loadingSettlement ? (
+                <div className="py-6 text-center text-xs text-emerald-300/80 flex justify-center items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                  Đang tải sao kê quyết toán khách sạn...
+                </div>
+              ) : settlementTransactions.length === 0 ? (
+                <div className="py-6 text-center text-xs text-emerald-300/70 bg-black/20 rounded-xl">
+                  Chưa có giao dịch quyết toán phòng nào. Tiền sẽ tự động đổ về ngay khi có khách đặt phòng kèm tour!
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-emerald-500/20 bg-slate-950/60">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-900/80 text-[11px] text-emerald-200 uppercase tracking-wider border-b border-emerald-500/20">
+                      <tr>
+                        <th className="px-4 py-2.5 font-semibold">Mã GD</th>
+                        <th className="px-4 py-2.5 font-semibold">Loại bút toán</th>
+                        <th className="px-4 py-2.5 font-semibold">Số tiền</th>
+                        <th className="px-4 py-2.5 font-semibold">Mã đơn (Booking)</th>
+                        <th className="px-4 py-2.5 font-semibold">Thời gian</th>
+                        <th className="px-4 py-2.5 font-semibold">Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-emerald-500/10">
+                      {settlementTransactions.map((tx) => {
+                        const isReversal = tx.transactionType === 'SETTLEMENT_REVERSAL';
+                        return (
+                          <tr key={tx.id || Math.random()} className="hover:bg-emerald-500/5 transition-colors">
+                            <td className="px-4 py-2.5 font-mono text-[11px] text-emerald-400">#{tx.id}</td>
+                            <td className="px-4 py-2.5">
+                              {isReversal ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                  Thu hồi (REVERSAL)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  Nhận 90% Tiền Phòng
+                                </span>
+                              )}
+                            </td>
+                            <td className={`px-4 py-2.5 font-bold ${isReversal ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {isReversal ? '-' : '+'}{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(tx.amount || 0)}
+                            </td>
+                            <td className="px-4 py-2.5 font-mono text-white">
+                              {tx.referenceId ? (
+                                <span className="bg-emerald-950 px-2 py-0.5 rounded border border-emerald-600/40">
+                                  {tx.referenceId}
+                                </span>
+                              ) : '—'}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-400 text-[11px]">
+                              {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-400 text-[11px]">
+                              {isReversal ? 'Khấu trừ 90% do khách hủy phòng hợp lệ' : 'Tự động giải ngân 90% tiền phòng'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

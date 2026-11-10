@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
 
 // Custom metrics to track success vs rejected booking requests
@@ -11,20 +11,21 @@ export const options = {
   scenarios: {
     concurrency_battle: {
       executor: 'per-vu-iterations',
-      vus: 20,           // 20 concurrent users
-      iterations: 1,     // 1 request per user simultaneously
+      vus: 50,           // 50 concurrent users fighting for seats
+      iterations: 1,     // 1 booking request per user at the exact same millisecond
       maxDuration: '30s',
     },
   },
   thresholds: {
-    // Exactly 1 booking must succeed
-    successful_bookings: ['count == 1'],
-    // Exactly 19 bookings must be rejected
-    rejected_bookings: ['count == 19'],
+    // Exactly 5 bookings must succeed (since only 5 seats exist)
+    successful_bookings: ['count == 5'],
+    // Exactly 45 bookings must be rejected safely
+    rejected_bookings: ['count == 45'],
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8089';
+const TOUR_ID = __ENV.TOUR_ID || 1;
 const DEPARTURE_ID = __ENV.DEPARTURE_ID || 201;
 
 export default function () {
@@ -32,20 +33,19 @@ export default function () {
   const idempotencyKey = `concurrency-vu-${vuId}-${Date.now()}`;
 
   const payload = JSON.stringify({
-    customerId: 10 + vuId,
-    tourDepartureId: Number(DEPARTURE_ID),
-    quantity: 1,
+    customerId: 9,
+    tourId: Number(TOUR_ID),
+    departureId: Number(DEPARTURE_ID),
+    tourName: 'Khám Phá Di Sản Đà Nẵng - Bà Nà Hills - Phố Cổ Hội An',
+    departureDate: '2026-12-25',
     unitPrice: 3500000,
-    contactName: `Contender #${vuId}`,
-    contactPhone: `09090000${vuId.toString().padStart(2, '0')}`,
-    contactEmail: `contender${vuId}@smarttrip.com`,
+    quantity: 1,
     idempotencyKey: idempotencyKey,
     passengers: [
       {
-        fullName: `Contender Passenger ${vuId}`,
+        fullName: `Khách hàng Contender #${vuId}`,
         phone: `09090000${vuId.toString().padStart(2, '0')}`,
         dateOfBirth: '1995-05-15',
-        passengerType: 'ADULT',
       },
     ],
   });
@@ -53,29 +53,25 @@ export default function () {
   const params = {
     headers: {
       'Content-Type': 'application/json',
-      'X-User-Id': String(10 + vuId),
+      'X-User-Id': '9',
     },
-    timeout: '10s',
+    timeout: '15s',
   };
 
   const res = http.post(`${BASE_URL}/api/v1/bookings`, payload, params);
 
-  const isAccepted = res.status === 200 || res.status === 202;
-  const isRejected = res.status === 400 || res.status === 409 || res.status === 422 || (res.status >= 400 && res.status < 500);
+  const isAccepted = res.status === 200 || res.status === 201 || res.status === 202;
 
   if (isAccepted) {
     successBookings.add(1);
     successRate.add(1);
-  } else if (isRejected) {
-    rejectedBookings.add(1);
-    successRate.add(0);
   } else {
-    // If backend returns other code or fails
     rejectedBookings.add(1);
     successRate.add(0);
   }
 
   check(res, {
     'request executed': (r) => r.status > 0,
+    'handled gracefully without 500 error': (r) => r.status !== 500,
   });
 }

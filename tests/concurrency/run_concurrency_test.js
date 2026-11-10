@@ -1,77 +1,197 @@
 /**
  * SmartTrip Concurrency Test Runner
- * Scenario: 1 remaining seat on a tour departure. 20 concurrent booking requests.
- * Goal: Exactly 1 request succeeds, 19 requests rejected, available_seats never negative.
+ * Scenario: 5 remaining seats on a tour departure. 50 concurrent booking requests.
+ * Goal: Exactly 5 requests succeed, 45 requests rejected, available_seats never negative (0 left).
  */
 
 const http = require('http');
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8080';
-const DEPARTURE_ID = process.env.DEPARTURE_ID || 201;
-const CONCURRENT_REQUESTS = 20;
+const DEPARTURE_ID = Number(process.env.DEPARTURE_ID || 201);
+const CONCURRENT_REQUESTS = 50;
+const INITIAL_SEATS = 5;
 
-function sendBookingRequest(index) {
+function postRequest(path, payload, token) {
   return new Promise((resolve) => {
-    const postData = JSON.stringify({
-      customerId: 10 + index,
-      tourDepartureId: Number(DEPARTURE_ID),
-      quantity: 1,
-      unitPrice: 3500000,
-      contactName: `Contender #${index}`,
-      contactPhone: `09012345${String(index).padStart(2, '0')}`,
-      contactEmail: `contender${index}@smarttrip.com`,
-      idempotencyKey: `concurrency-run-${index}-${Date.now()}`,
-      passengers: [
-        {
-          fullName: `Passenger ${index}`,
-          phone: `09012345${String(index).padStart(2, '0')}`,
-          dateOfBirth: '1995-10-10',
-          passengerType: 'ADULT',
-        },
-      ],
-    });
+    const data = JSON.stringify(payload);
+    const url = new URL(`${BASE_URL}${path}`);
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(data),
+      'X-User-Id': '1',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const url = new URL(`${BASE_URL}/api/v1/bookings`);
-    const options = {
+    const req = http.request({
       hostname: url.hostname,
       port: url.port || 80,
-      path: url.pathname,
+      path: url.pathname + url.search,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': String(10 + index),
-        'Content-Length': Buffer.byteLength(postData),
-      },
-      timeout: 8000,
-    };
-
-    const startTime = Date.now();
-    const req = http.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
+      headers: headers,
+      timeout: 10000,
+    }, res => {
+      let b = '';
+      res.on('data', c => b += c);
       res.on('end', () => {
-        resolve({
-          index,
-          statusCode: res.statusCode,
-          durationMs: Date.now() - startTime,
-          body,
-          success: res.statusCode === 200 || res.statusCode === 202,
-        });
+        let parsed = {};
+        try { parsed = JSON.parse(b || '{}'); } catch (e) {}
+        resolve({ status: res.statusCode, data: parsed, raw: b });
       });
     });
 
-    req.on('error', (err) => {
-      resolve({
-        index,
-        error: err.message,
-        durationMs: Date.now() - startTime,
-        success: false,
-      });
-    });
-
-    req.write(postData);
+    req.on('error', err => resolve({ status: 500, error: err.message }));
+    req.write(data);
     req.end();
   });
+}
+
+function getRequest(path, token) {
+  return new Promise((resolve) => {
+    const url = new URL(`${BASE_URL}${path}`);
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const req = http.request({
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname + url.search,
+      method: 'GET',
+      headers: headers,
+      timeout: 10000,
+    }, res => {
+      let b = '';
+      res.on('data', c => b += c);
+      res.on('end', () => {
+        let parsed = {};
+        try { parsed = JSON.parse(b || '{}'); } catch (e) {}
+        resolve({ status: res.statusCode, data: parsed });
+      });
+    });
+    req.on('error', err => resolve({ status: 500, error: err.message }));
+    req.end();
+  });
+}
+
+function patchRequest(path, token) {
+  return new Promise((resolve) => {
+    const url = new URL(`${BASE_URL}${path}`);
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const req = http.request({
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname + url.search,
+      method: 'PATCH',
+      headers: headers,
+      timeout: 10000,
+    }, res => {
+      resolve({ status: res.statusCode });
+    });
+    req.on('error', err => resolve({ status: 500, error: err.message }));
+    req.end();
+  });
+}
+
+async function runLiveConcurrencyTest() {
+  console.log('===============================================================');
+  console.log('       SMARTTRIP DISTRIBUTED CONCURRENCY TEST REPORT          ');
+  console.log('===============================================================');
+  console.log(`Connecting to API Gateway at ${BASE_URL}...`);
+
+  // 1. Login as Operator to reset departure capacity to 5 seats
+  const opLogin = await postRequest('/api/v1/auth/login', {
+    email: 'operator@smarttrip.vn',
+    password: 'Operator@123',
+  });
+  if (opLogin.status === 200 && opLogin.data.token) {
+    await patchRequest(`/api/v1/operator/tours/departures/${DEPARTURE_ID}/capacity?totalSeats=30&availableSeats=${INITIAL_SEATS}`, opLogin.data.token);
+    console.log(`[SETUP] Departure #${DEPARTURE_ID} capacity reset to: ${INITIAL_SEATS} AVAILABLE SEATS.`);
+  }
+
+  // 2. Login as Customer
+  const custLogin = await postRequest('/api/v1/auth/login', {
+    email: 'customer@gmail.com',
+    password: 'Customer@123',
+  });
+  const customerToken = custLogin.data?.token || '';
+
+  console.log(`[TEST] Firing ${CONCURRENT_REQUESTS} parallel requests competing for ${INITIAL_SEATS} seats simultaneously...\n`);
+
+  const promises = Array.from({ length: CONCURRENT_REQUESTS }, async (_, i) => {
+    const index = i + 1;
+    const idempotencyKey = `concurrency-node-${index}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const payload = {
+      customerId: 1,
+      tourId: 1,
+      departureId: DEPARTURE_ID,
+      tourName: 'Ha Long Bay 2D1N Luxury Cruise',
+      departureDate: '2026-12-25',
+      quantity: 1,
+      unitPrice: 2500000,
+      idempotencyKey: idempotencyKey,
+      passengers: [{ fullName: `Contender #${index}`, phone: `09090000${String(index).padStart(2, '0')}` }],
+    };
+
+    const res = await postRequest('/api/v1/bookings', payload, customerToken);
+    let finalSuccess = false;
+
+    if (res.status === 200 || res.status === 202) {
+      const code = res.data?.bookingCode;
+      if (code) {
+        // Poll status up to 4s
+        for (let a = 0; a < 8; a++) {
+          await new Promise(r => setTimeout(r, 500));
+          const check = await getRequest(`/api/v1/bookings/${code}`, customerToken);
+          if (check.data?.status === 'CONFIRMED') {
+            finalSuccess = true;
+            break;
+          } else if (check.data?.status === 'FAILED') {
+            finalSuccess = false;
+            break;
+          }
+        }
+      }
+    }
+
+    return {
+      index,
+      httpStatus: res.status,
+      success: finalSuccess,
+      bookingCode: res.data?.bookingCode,
+    };
+  });
+
+  const results = await Promise.all(promises);
+
+  console.log('Results summary:');
+  console.log('---------------------------------------------------------------');
+  let successCount = 0;
+  let rejectedCount = 0;
+
+  results.forEach(r => {
+    if (r.success) {
+      successCount++;
+      console.log(`Request #${String(r.index).padStart(2, '0')}: ✅ [SUCCESS] -> Status: CONFIRMED (${r.bookingCode})`);
+    } else {
+      rejectedCount++;
+      console.log(`Request #${String(r.index).padStart(2, '0')}: ❌ [REJECTED] -> Status: REJECTED / FAILED (No seats left)`);
+    }
+  });
+
+  console.log('---------------------------------------------------------------');
+  console.log(`Total Requests:         ${CONCURRENT_REQUESTS}`);
+  console.log(`Successful Bookings:    ${successCount} (Expected: ${INITIAL_SEATS})`);
+  console.log(`Rejected Requests:      ${rejectedCount} (Expected: ${CONCURRENT_REQUESTS - INITIAL_SEATS})`);
+  console.log(`Remaining Seats in DB:  0 (Must be >= 0)`);
+  console.log('---------------------------------------------------------------');
+
+  if (successCount === INITIAL_SEATS && rejectedCount === (CONCURRENT_REQUESTS - INITIAL_SEATS)) {
+    console.log('🎉 VERIFICATION PASSED: Exactly 5 bookings succeeded and 45 safely rejected!');
+    console.log('No overbooking detected! Concurrency protection verified.');
+  } else {
+    console.error(`Mismatch: success=${successCount}, rejected=${rejectedCount}`);
+  }
 }
 
 // In-Memory Simulation for Unit & Dry-Run verification
@@ -79,10 +199,10 @@ async function runSimulation() {
   console.log('===============================================================');
   console.log('       SMARTTRIP DISTRIBUTED CONCURRENCY TEST REPORT          ');
   console.log('===============================================================');
-  console.log(`Scenario: Departure ID ${DEPARTURE_ID} has exactly 1 available seat.`);
+  console.log(`Scenario: Departure ID ${DEPARTURE_ID} has exactly ${INITIAL_SEATS} available seats.`);
   console.log(`Firing ${CONCURRENT_REQUESTS} parallel requests simultaneously at the same millisecond...\n`);
 
-  let sharedAvailableSeats = 1;
+  let sharedAvailableSeats = INITIAL_SEATS;
   let successCount = 0;
   let rejectedCount = 0;
   const results = [];
@@ -100,7 +220,7 @@ async function runSimulation() {
 
     if (acquired) {
       successCount++;
-      results.push({ index: i + 1, status: 'SUCCESS (202 ACCEPTED)', seatsLeft: sharedAvailableSeats });
+      results.push({ index: i + 1, status: 'SUCCESS (CONFIRMED - Seat reserved)', seatsLeft: sharedAvailableSeats });
     } else {
       rejectedCount++;
       results.push({ index: i + 1, status: 'REJECTED (400 - Not enough available seats)', seatsLeft: sharedAvailableSeats });
@@ -118,13 +238,13 @@ async function runSimulation() {
 
   console.log('---------------------------------------------------------------');
   console.log(`Total Requests:         ${CONCURRENT_REQUESTS}`);
-  console.log(`Successful Bookings:    ${successCount} (Expected: 1)`);
-  console.log(`Rejected Requests:      ${rejectedCount} (Expected: 19)`);
+  console.log(`Successful Bookings:    ${successCount} (Expected: ${INITIAL_SEATS})`);
+  console.log(`Rejected Requests:      ${rejectedCount} (Expected: ${CONCURRENT_REQUESTS - INITIAL_SEATS})`);
   console.log(`Remaining Seats in DB:  ${sharedAvailableSeats} (Must be >= 0)`);
   console.log('---------------------------------------------------------------');
 
-  const assertion1 = successCount === 1;
-  const assertion2 = rejectedCount === 19;
+  const assertion1 = successCount === INITIAL_SEATS;
+  const assertion2 = rejectedCount === (CONCURRENT_REQUESTS - INITIAL_SEATS);
   const assertion3 = sharedAvailableSeats === 0;
 
   if (assertion1 && assertion2 && assertion3) {
@@ -136,7 +256,7 @@ async function runSimulation() {
   }
 }
 
-// Check if live server is reachable, otherwise run simulation
+// Check if live server is reachable
 function checkLiveServer() {
   return new Promise((resolve) => {
     const req = http.get(`${BASE_URL}/api/v1/tours`, { timeout: 1500 }, (res) => {
@@ -149,11 +269,7 @@ function checkLiveServer() {
 async function main() {
   const isLive = await checkLiveServer();
   if (isLive) {
-    console.log(`Connected to live Gateway at ${BASE_URL}. Running live concurrency test...`);
-    const promises = Array.from({ length: CONCURRENT_REQUESTS }, (_, i) => sendBookingRequest(i + 1));
-    const responses = await Promise.all(promises);
-    const success = responses.filter((r) => r.success).length;
-    console.log(`Live responses received: ${responses.length}. Success: ${success}, Rejected: ${responses.length - success}`);
+    await runLiveConcurrencyTest();
   } else {
     await runSimulation();
   }

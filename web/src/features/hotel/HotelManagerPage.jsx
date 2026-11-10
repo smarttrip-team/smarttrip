@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { hotelApi, hotelManagerApi } from '../../services/api';
 import { useAuthWallet } from '../../context/AuthWalletContext';
 import {
   Building2,
+  Wallet,
+  ArrowUpRight,
   Calendar,
   BedDouble,
   DollarSign,
@@ -17,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export default function HotelManagerPage() {
-  const { showToast } = useAuthWallet();
+  const { showToast, wallet } = useAuthWallet();
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,6 +132,36 @@ export default function HotelManagerPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Hotel Manager Wallet & Revenue Overview */}
+        <div className="bg-gradient-to-r from-emerald-800 via-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-md relative overflow-hidden border border-emerald-500/20 mb-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+                  Đối tác Khách Sạn
+                </span>
+                <span className="text-xs text-slate-300">| Khấu trừ 10% hoa hồng nền tảng SmartTrip</span>
+              </div>
+              <h2 className="text-xl font-bold flex items-center gap-2 text-white mt-1">
+                <Wallet className="w-6 h-6 text-emerald-400" />
+                Ví Doanh Thu Khách Sạn: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(wallet?.balance || 0)}
+              </h2>
+              <p className="text-xs text-emerald-200">
+                Doanh thu tiền phòng thực nhận 90% được hệ thống tự động quyết toán vào ví ngay khi khách đặt phòng
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/wallet"
+                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors"
+              >
+                <span>Xem Sao Kê Ví</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left Panel: Hotels & Room Types (6 columns) */}
           <div className="lg:col-span-6 space-y-4">

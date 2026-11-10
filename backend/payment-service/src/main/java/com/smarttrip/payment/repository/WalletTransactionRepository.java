@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, Long> {
     List<WalletTransaction> findByWalletIdOrderByCreatedAtDesc(Long walletId);
     Optional<WalletTransaction> findByIdempotencyKey(String idempotencyKey);
+    List<WalletTransaction> findByReferenceTypeAndReferenceId(String referenceType, String referenceId);
 }

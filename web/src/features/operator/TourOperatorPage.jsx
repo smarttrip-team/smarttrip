@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { tourApi, operatorApi, bookingApi } from '../../services/api';
 import { useAuthWallet } from '../../context/AuthWalletContext';
 import {
   Layers,
   PlusCircle,
+  Wallet,
+  ArrowUpRight,
   Calendar,
   Users,
   DollarSign,
@@ -24,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function TourOperatorPage() {
-  const { showToast, currentUserId } = useAuthWallet();
+  const { showToast, currentUserId, wallet } = useAuthWallet();
   const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -221,6 +224,36 @@ export default function TourOperatorPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Tour Operator Wallet & Revenue Overview */}
+        <div className="bg-gradient-to-r from-teal-800 via-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-md relative overflow-hidden border border-teal-500/20">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-teal-400/20 text-teal-300 border border-teal-400/30">
+                  Đối tác Điều hành Tour
+                </span>
+                <span className="text-xs text-slate-300">| Khấu trừ 10% hoa hồng nền tảng SmartTrip</span>
+              </div>
+              <h2 className="text-xl font-bold flex items-center gap-2 text-white mt-1">
+                <Wallet className="w-6 h-6 text-teal-400" />
+                Ví Doanh Thu Đối Tác: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(wallet?.balance || 0)}
+              </h2>
+              <p className="text-xs text-teal-200">
+                Doanh thu tour thực nhận 90% được hệ thống tự động quyết toán vào ví ngay khi khách hoàn tất đặt chỗ
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/wallet"
+                className="flex items-center gap-1.5 px-4 py-2 bg-teal-400 hover:bg-teal-300 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors"
+              >
+                <span>Xem Sao Kê Ví</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* Operator Emergency Cancellation & Refund Tool */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">

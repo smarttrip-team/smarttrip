@@ -81,6 +81,14 @@ export const WalletPage = () => {
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800"><CheckCircle2 className="w-3 h-3" /> Hoàn tiền (REFUND)</span>;
       case 'RELEASE':
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800"><RefreshCw className="w-3 h-3" /> Hủy giữ (RELEASE)</span>;
+      case 'SETTLEMENT_TOUR':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800"><ArrowDownLeft className="w-3 h-3" /> Nhận tiền Tour 90% (SETTLEMENT)</span>;
+      case 'SETTLEMENT_HOTEL':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800"><ArrowDownLeft className="w-3 h-3" /> Nhận tiền KS 90% (SETTLEMENT)</span>;
+      case 'COMMISSION_REVENUE':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800"><ArrowDownLeft className="w-3 h-3" /> Hoa hồng sàn 10% (COMMISSION)</span>;
+      case 'SETTLEMENT_REVERSAL':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800"><ArrowUpRight className="w-3 h-3" /> Thu hồi quyết toán (REVERSAL)</span>;
       default:
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">{type}</span>;
     }
@@ -295,7 +303,7 @@ export const WalletPage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {transactions.map((tx) => {
-                  const isPositive = tx.transactionType === 'TOP_UP' || tx.transactionType === 'REFUND';
+                  const isPositive = ['TOP_UP', 'REFUND', 'SETTLEMENT_TOUR', 'SETTLEMENT_HOTEL', 'COMMISSION_REVENUE'].includes(tx.transactionType);
                   return (
                     <tr key={tx.id || Math.random()} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-3.5 font-mono text-xs text-slate-500">
@@ -336,3 +344,5 @@ export const WalletPage = () => {
     </div>
   );
 };
+
+

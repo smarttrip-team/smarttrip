@@ -116,8 +116,16 @@ public class PaymentCommandHandler {
 
     private void handleCapture(CapturePaymentCommand cmd) {
         try {
-            paymentService.capture(cmd.getUserId(), cmd.getBookingCode(), cmd.getAmount());
-            log.info("Payment captured for booking {}", cmd.getBookingCode());
+            paymentService.capture(
+                    cmd.getUserId(),
+                    cmd.getBookingCode(),
+                    cmd.getAmount(),
+                    cmd.getOperatorId(),
+                    cmd.getTourAmount(),
+                    cmd.getHotelierId(),
+                    cmd.getHotelAmount()
+            );
+            log.info("Payment captured and settled for booking {}", cmd.getBookingCode());
         } catch (Exception e) {
             log.error("Failed to capture payment for booking {}: {}", cmd.getBookingCode(), e.getMessage());
         }

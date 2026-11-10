@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -48,15 +49,16 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BusinessException("User ID is required");
         }
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("Top-up amount must be greater than zero");
+            throw new BusinessException("Top up amount must be greater than zero");
         }
 
         // Idempotency check
         if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
             var existingTx = walletTransactionRepository.findByIdempotencyKey(request.getIdempotencyKey());
             if (existingTx.isPresent()) {
-                log.info("Duplicate top-up request with idempotency key: {}", request.getIdempotencyKey());
-                return mapWalletToResponse(existingTx.get().getWallet());
+                log.info("Duplicate top-up request with key: {}", request.getIdempotencyKey());
+                Wallet wallet = existingTx.get().getWallet();
+                return mapWalletToResponse(wallet);
             }
         }
 
@@ -64,18 +66,19 @@ public class PaymentServiceImpl implements PaymentService {
         wallet.setBalance(wallet.getBalance().add(request.getAmount()));
         Wallet savedWallet = walletRepository.save(wallet);
 
+        String refId = "TOP_UP-" + System.currentTimeMillis();
         WalletTransaction tx = WalletTransaction.builder()
                 .wallet(savedWallet)
                 .transactionType("TOP_UP")
                 .amount(request.getAmount())
                 .referenceType("TOP_UP")
-                .referenceId("TOP_UP-" + System.currentTimeMillis())
+                .referenceId(refId)
                 .idempotencyKey(request.getIdempotencyKey())
                 .build();
         walletTransactionRepository.save(tx);
 
-        log.info("Top-up successful for user {}: +{} VND. New balance: {}",
-                wallet.getUserId(), request.getAmount(), savedWallet.getBalance());
+        log.info("Top-up successful for user {}: +{} VND, new balance: {}",
+                request.getUserId(), request.getAmount(), savedWallet.getBalance());
 
         return mapWalletToResponse(savedWallet);
     }
@@ -97,9 +100,9 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentByBookingId(String bookingId) {
-        return paymentRepository.findByBookingId(bookingId)
-                .map(this::mapPaymentToResponse)
+        Payment payment = paymentRepository.findByBookingId(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for booking: " + bookingId));
+        return mapPaymentToResponse(payment);
     }
 
     @Override
@@ -110,15 +113,30 @@ public class PaymentServiceImpl implements PaymentService {
         }
         Wallet wallet = getOrCreateWallet(userId);
 
-        if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+        BigDecimal available = wallet.getAvailableBalance();
+        if (available.compareTo(amount) < 0) {
             throw new BusinessException(String.format(
-                    "Insufficient wallet balance. Available: %s, Required: %s",
-                    wallet.getAvailableBalance(), amount
-            ));
+                    "Insufficient available balance: available %s, required %s", available, amount));
         }
 
         wallet.setHeldAmount(wallet.getHeldAmount().add(amount));
         walletRepository.save(wallet);
+
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .orElseGet(() -> paymentRepository.save(Payment.builder()
+                        .bookingId(bookingId)
+                        .amount(amount)
+                        .currency("VND")
+                        .status("PENDING")
+                        .build()));
+
+        PaymentAuthorization auth = PaymentAuthorization.builder()
+                .payment(payment)
+                .authorizedAmount(amount)
+                .status("AUTHORIZED")
+                .expiresAt(LocalDateTime.now().plusHours(2))
+                .build();
+        paymentAuthorizationRepository.save(auth);
 
         WalletTransaction tx = WalletTransaction.builder()
                 .wallet(wallet)
@@ -129,34 +147,21 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
         walletTransactionRepository.save(tx);
 
-        Payment payment = paymentRepository.findByBookingId(bookingId)
-                .orElseGet(() -> Payment.builder()
-                        .bookingId(bookingId)
-                        .userId(userId)
-                        .amount(amount)
-                        .currency(wallet.getCurrency())
-                        .build());
-        payment.setStatus("AUTHORIZED");
-        payment.setAmount(amount);
-        Payment savedPayment = paymentRepository.save(payment);
+        log.info("Authorized payment for booking {}: amount={}, user={}, held={}",
+                bookingId, amount, userId, wallet.getHeldAmount());
 
-        PaymentAuthorization auth = PaymentAuthorization.builder()
-                .payment(savedPayment)
-                .authorizedAmount(amount)
-                .status("AUTHORIZED")
-                .expiresAt(LocalDateTime.now().plusHours(24))
-                .build();
-        paymentAuthorizationRepository.save(auth);
-
-        log.info("Authorized payment for booking {}: amount={}, heldAmount={}",
-                bookingId, amount, wallet.getHeldAmount());
-
-        return mapPaymentToResponse(savedPayment);
+        return mapPaymentToResponse(payment);
     }
 
     @Override
     @Transactional
     public PaymentResponse capture(Long userId, String bookingId, BigDecimal amount) {
+        return capture(userId, bookingId, amount, 2L, amount, 3L, BigDecimal.ZERO);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse capture(Long userId, String bookingId, BigDecimal amount, Long operatorId, BigDecimal tourAmount, Long hotelierId, BigDecimal hotelAmount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("Capture amount must be greater than zero");
         }
@@ -193,7 +198,10 @@ public class PaymentServiceImpl implements PaymentService {
                     paymentAuthorizationRepository.save(auth);
                 });
 
-        log.info("Captured payment for booking {}: amount={}, remaining balance={}",
+        // Trigger automatic revenue settlement with 10% platform fee
+        settleBooking(bookingId, operatorId, tourAmount, hotelierId, hotelAmount);
+
+        log.info("Captured payment and settled revenues for booking {}: amount={}, remaining customer balance={}",
                 bookingId, amount, wallet.getBalance());
 
         return mapPaymentToResponse(savedPayment);
@@ -228,10 +236,10 @@ public class PaymentServiceImpl implements PaymentService {
         auth.setStatus("VOIDED");
         paymentAuthorizationRepository.save(auth);
 
-        payment.setStatus("VOIDED");
+        payment.setStatus("FAILED");
         paymentRepository.save(payment);
 
-        log.info("Voided authorization for booking {}: released amount={}", bookingId, amount);
+        log.info("Voided authorization for booking {}: released {} VND for user {}", bookingId, amount, userId);
     }
 
     @Override
@@ -267,9 +275,142 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setStatus("REFUNDED");
         Payment savedPayment = paymentRepository.save(payment);
 
+        // Reverse settlements from partner and platform wallets
+        reverseSettlement(bookingId, amount, payment.getAmount());
+
         log.info("Refunded payment for booking {}: +{} VND to user {}", bookingId, amount, userId);
 
         return mapPaymentToResponse(savedPayment);
+    }
+
+    @Override
+    @Transactional
+    public void settleBooking(String bookingCode, Long operatorId, BigDecimal tourAmount, Long hotelierId, BigDecimal hotelAmount) {
+        Long targetOpId = (operatorId != null) ? operatorId : 2L;      // Default: Tour Operator Thái (User 2)
+        Long targetHotelId = (hotelierId != null) ? hotelierId : 3L;   // Default: Khách sạn Mường Thanh (User 3)
+        Long platformAdminId = 4L;                                     // Platform Admin Sàn SmartTrip (User 4)
+
+        BigDecimal targetTourAmount = (tourAmount != null && tourAmount.compareTo(BigDecimal.ZERO) > 0)
+                ? tourAmount
+                : BigDecimal.ZERO;
+        BigDecimal targetHotelAmount = (hotelAmount != null && hotelAmount.compareTo(BigDecimal.ZERO) > 0)
+                ? hotelAmount
+                : BigDecimal.ZERO;
+
+        BigDecimal partnerRate = new BigDecimal("0.90"); // 90% Đối tác
+
+        // 1. Phân bổ phần Tour
+        if (targetTourAmount.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal opPayout = targetTourAmount.multiply(partnerRate).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal platformTourFee = targetTourAmount.subtract(opPayout);
+
+            Wallet opWallet = getOrCreateWallet(targetOpId);
+            opWallet.setBalance(opWallet.getBalance().add(opPayout));
+            walletRepository.save(opWallet);
+
+            WalletTransaction opTx = WalletTransaction.builder()
+                    .wallet(opWallet)
+                    .transactionType("SETTLEMENT_TOUR")
+                    .amount(opPayout)
+                    .referenceType("BOOKING")
+                    .referenceId(bookingCode)
+                    .build();
+            walletTransactionRepository.save(opTx);
+
+            Wallet adminWallet = getOrCreateWallet(platformAdminId);
+            adminWallet.setBalance(adminWallet.getBalance().add(platformTourFee));
+            walletRepository.save(adminWallet);
+
+            WalletTransaction feeTx = WalletTransaction.builder()
+                    .wallet(adminWallet)
+                    .transactionType("COMMISSION_REVENUE")
+                    .amount(platformTourFee)
+                    .referenceType("BOOKING")
+                    .referenceId(bookingCode)
+                    .build();
+            walletTransactionRepository.save(feeTx);
+
+            log.info("Settled Tour Revenue for booking {}: +{} VND (90%) to Operator {}, +{} VND (10%) to Platform",
+                    bookingCode, opPayout, targetOpId, platformTourFee);
+        }
+
+        // 2. Phân bổ phần Khách sạn
+        if (targetHotelAmount.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal hotelPayout = targetHotelAmount.multiply(partnerRate).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal platformHotelFee = targetHotelAmount.subtract(hotelPayout);
+
+            Wallet hotelWallet = getOrCreateWallet(targetHotelId);
+            hotelWallet.setBalance(hotelWallet.getBalance().add(hotelPayout));
+            walletRepository.save(hotelWallet);
+
+            WalletTransaction hotelTx = WalletTransaction.builder()
+                    .wallet(hotelWallet)
+                    .transactionType("SETTLEMENT_HOTEL")
+                    .amount(hotelPayout)
+                    .referenceType("BOOKING")
+                    .referenceId(bookingCode)
+                    .build();
+            walletTransactionRepository.save(hotelTx);
+
+            Wallet adminWallet = getOrCreateWallet(platformAdminId);
+            adminWallet.setBalance(adminWallet.getBalance().add(platformHotelFee));
+            walletRepository.save(adminWallet);
+
+            WalletTransaction feeTx = WalletTransaction.builder()
+                    .wallet(adminWallet)
+                    .transactionType("COMMISSION_REVENUE")
+                    .amount(platformHotelFee)
+                    .referenceType("BOOKING")
+                    .referenceId(bookingCode)
+                    .build();
+            walletTransactionRepository.save(feeTx);
+
+            log.info("Settled Hotel Revenue for booking {}: +{} VND (90%) to Hotelier {}, +{} VND (10%) to Platform",
+                    bookingCode, hotelPayout, targetHotelId, platformHotelFee);
+        }
+    }
+
+    private void reverseSettlement(String bookingCode, BigDecimal refundAmount, BigDecimal totalBookingAmount) {
+        try {
+            List<WalletTransaction> existingSettlements = walletTransactionRepository.findByReferenceTypeAndReferenceId("BOOKING", bookingCode);
+            if (existingSettlements == null || existingSettlements.isEmpty()) {
+                return;
+            }
+
+            BigDecimal ratio = (totalBookingAmount != null && totalBookingAmount.compareTo(BigDecimal.ZERO) > 0)
+                    ? refundAmount.divide(totalBookingAmount, 4, RoundingMode.HALF_UP)
+                    : BigDecimal.ONE;
+
+            for (WalletTransaction st : existingSettlements) {
+                if ("SETTLEMENT_TOUR".equals(st.getTransactionType()) ||
+                    "SETTLEMENT_HOTEL".equals(st.getTransactionType()) ||
+                    "COMMISSION_REVENUE".equals(st.getTransactionType())) {
+
+                    BigDecimal clawback = st.getAmount().multiply(ratio).setScale(2, RoundingMode.HALF_UP);
+                    Wallet w = st.getWallet();
+                    if (w != null && clawback.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal newBalance = w.getBalance().subtract(clawback);
+                        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+                            newBalance = BigDecimal.ZERO;
+                        }
+                        w.setBalance(newBalance);
+                        walletRepository.save(w);
+
+                        WalletTransaction revTx = WalletTransaction.builder()
+                                .wallet(w)
+                                .transactionType("SETTLEMENT_REVERSAL")
+                                .amount(clawback)
+                                .referenceType("BOOKING")
+                                .referenceId(bookingCode)
+                                .build();
+                        walletTransactionRepository.save(revTx);
+                        log.info("Reversed {} VND from wallet {} for cancelled booking {}", clawback, w.getUserId(), bookingCode);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Error during settlement reversal for booking {}: {}", bookingCode, e.getMessage());
+        }
     }
 
     private Wallet getOrCreateWallet(Long userId) {

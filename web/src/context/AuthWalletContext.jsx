@@ -4,12 +4,12 @@ import { walletApi, authApi } from '../services/api';
 const AuthWalletContext = createContext(null);
 
 export const PRESET_USERS = [
-  { id: 10, name: 'Lê Quang Vĩnh', email: 'vinhle@smarttrip.com', role: 'ROLE_CUSTOMER', roleLabel: 'Customer' },
-  { id: 1, name: 'Nguyễn Hồng Thái (Operator)', email: 'operator@smarttrip.com', role: 'ROLE_TOUR_OPERATOR', roleLabel: 'Tour Operator' },
+  { id: 5, name: 'Nguyễn Hồng Thái (Customer)', email: 'thai@gmail.com', role: 'ROLE_CUSTOMER', roleLabel: 'Customer' },
+  { id: 2, name: 'Nguyễn Hồng Thái (Operator)', email: 'operator@smarttrip.com', role: 'ROLE_TOUR_OPERATOR', roleLabel: 'Tour Operator' },
   { id: 6, name: 'Trần Quốc Bảo (Tour Manager)', email: 'tourmanager2@smarttrip.com', role: 'ROLE_TOUR_OPERATOR', roleLabel: 'Tour Manager 2' },
-  { id: 2, name: 'Khách sạn Mường Thanh (Manager)', email: 'hotelier@smarttrip.com', role: 'ROLE_HOTEL_MANAGER', roleLabel: 'Hotel Manager' },
+  { id: 3, name: 'Khách sạn Mường Thanh (Manager)', email: 'hotelier@smarttrip.com', role: 'ROLE_HOTEL_MANAGER', roleLabel: 'Hotel Manager' },
   { id: 7, name: 'Lê Thu Trang (Hotel Manager)', email: 'hotelmanager2@smarttrip.com', role: 'ROLE_HOTEL_MANAGER', roleLabel: 'Hotel Manager 2' },
-  { id: 3, name: 'Hệ thống Quản trị (Admin)', email: 'admin@smarttrip.com', role: 'ROLE_ADMIN', roleLabel: 'Admin' },
+  { id: 4, name: 'Hệ thống Quản trị (Admin)', email: 'admin@smarttrip.com', role: 'ROLE_ADMIN', roleLabel: 'Admin' },
 ];
 
 export const AuthWalletProvider = ({ children }) => {
@@ -18,15 +18,15 @@ export const AuthWalletProvider = ({ children }) => {
   });
 
   const [currentUserId, setCurrentUserId] = useState(() => {
-    return Number(localStorage.getItem('smarttrip_user_id')) || 10;
+    return Number(localStorage.getItem('smarttrip_user_id')) || 5;
   });
 
   const [currentUserName, setCurrentUserName] = useState(() => {
-    return localStorage.getItem('smarttrip_user_name') || 'Lê Quang Vĩnh';
+    return localStorage.getItem('smarttrip_user_name') || 'Nguyễn Hồng Thái';
   });
 
   const [currentUserEmail, setCurrentUserEmail] = useState(() => {
-    return localStorage.getItem('smarttrip_user_email') || 'vinhle@smarttrip.com';
+    return localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
   });
 
   const [currentRole, setCurrentRole] = useState(() => {
@@ -87,9 +87,7 @@ export const AuthWalletProvider = ({ children }) => {
     if (token) {
       localStorage.setItem('smarttrip_token', token);
     }
-    if (currentRole === 'ROLE_CUSTOMER') {
-      refreshWallet(currentUserId);
-    }
+    refreshWallet(currentUserId);
   }, [currentUserId, currentUserName, currentUserEmail, currentRole, roles, token, refreshWallet]);
 
   // Login handler

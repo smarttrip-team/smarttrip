@@ -235,13 +235,29 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
         }
         completeStep(saga, "CONFIRM_RESOURCES");
 
-        // Step 6: Capture Payment
+        // Step 6: Capture Payment & Multi-Party Settlement
         recordStep(saga, "CAPTURE_PAYMENT", "COMMAND", "PENDING");
+        BigDecimal tourSubtotal = booking.getItems().isEmpty()
+                ? booking.getTotalAmount()
+                : booking.getItems().get(0).getSubtotal();
+        BigDecimal hotelSubtotal = BigDecimal.ZERO;
+        if (booking.getHotelDetails() != null && !booking.getHotelDetails().isEmpty()) {
+            hotelSubtotal = booking.getHotelDetails().stream()
+                    .map(hd -> hd.getPriceSnapshot() != null
+                            ? hd.getPriceSnapshot().multiply(BigDecimal.valueOf(hd.getRoomQuantity()))
+                            : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
         CapturePaymentCommand captureCmd = CapturePaymentCommand.builder()
                 .bookingId(booking.getId())
                 .bookingCode(booking.getBookingCode())
                 .userId(booking.getCustomerId())
                 .amount(booking.getTotalAmount())
+                .operatorId(2L)
+                .tourAmount(tourSubtotal)
+                .hotelierId(3L)
+                .hotelAmount(hotelSubtotal)
                 .build();
         outboxPublisher.enqueueAndPublish(
                 "BOOKING",

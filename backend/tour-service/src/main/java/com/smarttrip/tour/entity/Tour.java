@@ -40,6 +40,9 @@ public class Tour {
     @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal basePrice;
 
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default

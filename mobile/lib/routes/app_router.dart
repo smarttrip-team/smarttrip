@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../models/tour_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/tour_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
+import '../screens/tour/tour_detail_screen.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
   return GoRouter(
@@ -43,6 +47,13 @@ GoRouter createRouter(AuthProvider authProvider) {
           icon: Icons.person,
           authProvider: authProvider,
         ),
+      ),
+      GoRoute(
+        path: '/tour/:id',
+        builder: (context, state) {
+          final tour = state.extra as TourModel;
+          return TourDetailScreen(tour: tour);
+        },
       ),
       GoRoute(
         path: '/operator',
@@ -103,6 +114,7 @@ class _RoleWelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = authProvider.currentUser;
+    final tourProvider = context.watch<TourProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -119,7 +131,7 @@ class _RoleWelcomeScreen extends StatelessWidget {
         ],
       ),
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -141,6 +153,29 @@ class _RoleWelcomeScreen extends StatelessWidget {
                 style: const TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 24),
+
+              // Nút xem chi tiết tour mẫu
+              if (tourProvider.tours.isNotEmpty) ...[
+                const Text(
+                  'Tour mẫu sẵn sàng trải nghiệm:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 10),
+                Card(
+                  elevation: 2,
+                  child: ListTile(
+                    leading: const Icon(Icons.travel_explore, color: Colors.blue),
+                    title: Text(tourProvider.tours.first.title),
+                    subtitle: Text('${tourProvider.tours.first.destination} • ${tourProvider.tours.first.duration}'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      context.push('/tour/${tourProvider.tours.first.id}', extra: tourProvider.tours.first);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white),
                 onPressed: () async {

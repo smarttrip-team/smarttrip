@@ -589,11 +589,67 @@ public class BookingSagaOrchestratorImpl implements BookingSagaOrchestrator {
         completeStep(saga, "COMPENSATE_HOTEL");
     }
 
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 4000)
+    @Transactional
+    public void detectAndHandleSagaTimeouts() {
+        List<SagaInstance> processingSagas = sagaInstanceRepository.findByStatus("PROCESSING");
+        if (processingSagas.isEmpty()) return;
+
+        LocalDateTime now = LocalDateTime.now();
+        for (SagaInstance saga : processingSagas) {
+            if (saga.getStartedAt() != null && ChronoUnit.SECONDS.between(saga.getStartedAt(), now) >= 12) {
+                log.warn("Saga {} for bookingId {} timed out after >=12s in step {}",
+                        saga.getSagaId(), saga.getBookingId(), saga.getCurrentStep());
+
+                Booking booking = bookingRepository.findById(saga.getBookingId()).orElse(null);
+                if (booking == null) continue;
+
+                String stepName = saga.getCurrentStep() != null ? saga.getCurrentStep() : "DOWNSTREAM_SERVICE";
+                String timeoutReason = "Dịch vụ " + stepName + " không phản hồi (Service Timeout/Down)";
+
+                // 1. Mark current pending step as FAILED
+                failStep(saga, stepName, timeoutReason);
+
+                // 2. Compensate previous successful steps
+                if ("RESERVE_HOTEL".equals(stepName)) {
+                    compensateTour(saga, booking, "TIMEOUT");
+                } else if ("AUTHORIZE_PAYMENT".equals(stepName)) {
+                    compensateTour(saga, booking, "TIMEOUT");
+                    if (booking.getHotelDetails() != null && !booking.getHotelDetails().isEmpty()) {
+                        compensateHotel(saga, booking, "TIMEOUT");
+                    }
+                }
+
+                // 3. Mark booking FAILED
+                booking.setStatus("FAILED");
+                bookingRepository.save(booking);
+
+                // 4. Mark Saga COMPENSATED
+                saga.setStatus("COMPENSATED");
+                saga.setCurrentStep("COMPENSATED");
+                saga.setFailureReason(timeoutReason);
+                saga.setCompletedAt(now);
+                sagaInstanceRepository.save(saga);
+
+                log.warn("Saga {} auto-compensated due to timeout. Booking {} is now FAILED.",
+                        saga.getSagaId(), booking.getBookingCode());
+            }
+        }
+    }
+
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public SagaInstance getSagaByBookingId(Long bookingId) {
-        return sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(bookingId)
+        SagaInstance saga = sagaInstanceRepository.findTopByBookingIdOrderByIdDesc(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Saga not found for booking: " + bookingId));
+
+        if ("PROCESSING".equals(saga.getStatus()) && saga.getStartedAt() != null
+                && ChronoUnit.SECONDS.between(saga.getStartedAt(), LocalDateTime.now()) >= 12) {
+            detectAndHandleSagaTimeouts();
+            return sagaInstanceRepository.findById(saga.getId()).orElse(saga);
+        }
+
+        return saga;
     }
 
     @Override

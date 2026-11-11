@@ -1,4 +1,7 @@
 services:
+  # ==========================================
+  # 1. DATABASE (MySQL 8.4)
+  # ==========================================
   mysql:
     image: mysql:8.4
     container_name: smarttrip-mysql
@@ -24,6 +27,27 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
 
+  # ==========================================
+  # 1.1. DATABASE - MICROSOFT SQL SERVER 2022 (Payment Service)
+  # ==========================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: smarttrip-sqlserver
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-SmartTrip@Pwd2026!}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 2. MESSAGE BROKER (RabbitMQ 3.13)
+  # ==========================================
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: smarttrip-rabbitmq
@@ -45,10 +69,224 @@ services:
       retries: 5
       start_period: 20s
 
+  # ==========================================
+  # 3. SERVICE DISCOVERY (Eureka Discovery Service)
+  # ==========================================
+  discovery-service:
+    build:
+      context: ./backend/discovery-service
+    image: smarttrip/discovery-service:latest
+    container_name: smarttrip-discovery
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    environment:
+      SERVER_PORT: 8761
+      EUREKA_INSTANCE_HOSTNAME: discovery-service
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 4. USER SERVICE
+  # ==========================================
+  user-service:
+    build:
+      context: ./backend/user-service
+    image: smarttrip/user-service:latest
+    container_name: smarttrip-user-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    environment:
+      SERVER_PORT: 8081
+      USER_DB_URL: jdbc:mysql://mysql:3306/smarttrip_user_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_USER: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-smarttrip_root_pwd}
+      EUREKA_SERVER_URL: http://discovery-service:8761/eureka/
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 5. TOUR SERVICE
+  # ==========================================
+  tour-service:
+    build:
+      context: ./backend/tour-service
+    image: smarttrip/tour-service:latest
+    container_name: smarttrip-tour-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/smarttrip_tour_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-smarttrip_root_pwd}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-smarttrip}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-smarttrip123}
+      EUREKA_SERVER_URL: http://discovery-service:8761/eureka/
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 6. HOTEL SERVICE
+  # ==========================================
+  hotel-service:
+    build:
+      context: ./backend/hotel-service
+    image: smarttrip/hotel-service:latest
+    container_name: smarttrip-hotel-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    environment:
+      SERVER_PORT: 8083
+      HOTEL_DB_URL: jdbc:mysql://mysql:3306/smarttrip_hotel_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-smarttrip_root_pwd}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-smarttrip}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-smarttrip123}
+      EUREKA_SERVER_URL: http://discovery-service:8761/eureka/
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 7. PAYMENT SERVICE
+  # ==========================================
+  payment-service:
+    build:
+      context: ./backend/payment-service
+    image: smarttrip/payment-service:latest
+    container_name: smarttrip-payment-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    depends_on:
+      sqlserver:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    environment:
+      SERVER_PORT: 8084
+      PAYMENT_DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=smarttrip_payment_db;encrypt=false;trustServerCertificate=true
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD:-SmartTrip@Pwd2026!}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-smarttrip}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-smarttrip123}
+      EUREKA_SERVER_URL: http://discovery-service:8761/eureka/
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 8. BOOKING SERVICE (Saga Orchestrator)
+  # ==========================================
+  booking-service:
+    build:
+      context: ./backend/booking-service
+    image: smarttrip/booking-service:latest
+    container_name: smarttrip-booking-service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    environment:
+      SERVER_PORT: 8085
+      BOOKING_DB_URL: jdbc:mysql://mysql:3306/smarttrip_booking_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-smarttrip_root_pwd}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-smarttrip}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-smarttrip123}
+      EUREKA_SERVER_URL: http://discovery-service:8761/eureka/
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 9. API GATEWAY (Spring Cloud Gateway)
+  # ==========================================
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+    image: smarttrip/api-gateway:latest
+    container_name: smarttrip-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - discovery-service
+    environment:
+      SERVER_PORT: 8080
+      EUREKA_SERVER_URL: http://discovery-service:8761/eureka/
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    networks:
+      - smarttrip-network
+
+  # ==========================================
+  # 10. FRONTEND (React SPA with Nginx)
+  # ==========================================
+  web:
+    build:
+      context: ./web
+    image: smarttrip/web:latest
+    container_name: smarttrip-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - smarttrip-network
+
 volumes:
   mysql_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  sqlserver_data:
     driver: local
 
 networks:

@@ -43,7 +43,16 @@ export const CheckoutPage = () => {
   const [roomPrice, setRoomPrice] = useState(Number(searchParams.get('hotelPrice')) || 1200000);
   const [roomQuantity, setRoomQuantity] = useState(1);
   const [checkInDate, setCheckInDate] = useState(initialDepartureDate);
-  const [checkOutDate, setCheckOutDate] = useState('2026-11-22');
+  const initialReturnDate = searchParams.get('returnDate') || searchParams.get('checkOutDate') || (() => {
+    try {
+      const d = new Date(initialDepartureDate);
+      d.setDate(d.getDate() + 2);
+      return d.toISOString().split('T')[0];
+    } catch {
+      return '2026-11-22';
+    }
+  })();
+  const [checkOutDate, setCheckOutDate] = useState(initialReturnDate);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customIdempotencyKey, setCustomIdempotencyKey] = useState('');

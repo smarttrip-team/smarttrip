@@ -767,11 +767,23 @@ export const TourDetailPage = () => {
 
   // Handle proceed to checkout
   const handleProceedCheckout = () => {
+    const depDate = selectedDeparture?.departureDate || "2026-12-01";
+    const retDate = selectedDeparture?.returnDate || (() => {
+      try {
+        const d = new Date(depDate);
+        d.setDate(d.getDate() + (tour.durationDays || 3));
+        return d.toISOString().split('T')[0];
+      } catch {
+        return "2026-12-04";
+      }
+    })();
+
     const params = new URLSearchParams({
       tourId: String(tour.id),
       tourName: tour.name,
       departureId: String(selectedDeparture?.id || 1),
-      departureDate: selectedDeparture?.departureDate || "2026-12-01",
+      departureDate: depDate,
+      returnDate: retDate,
       unitPrice: String(unitTourPrice),
       quantity: String(guestsCount),
       hasHotel: includeHotel && selectedRoom ? "true" : "false",

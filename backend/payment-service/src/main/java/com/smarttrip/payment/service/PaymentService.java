@@ -22,7 +22,11 @@ public interface PaymentService {
 
     PaymentResponse capture(Long userId, String bookingId, BigDecimal amount);
 
+    PaymentResponse capture(Long userId, String bookingId, BigDecimal amount, Long operatorId, BigDecimal tourAmount, Long hotelierId, BigDecimal hotelAmount);
+
     void voidAuthorization(Long userId, String bookingId);
 
     PaymentResponse refund(Long userId, String bookingId, BigDecimal amount, String reason);
+
+    void settleBooking(String bookingCode, Long operatorId, BigDecimal tourAmount, Long hotelierId, BigDecimal hotelAmount);
 }

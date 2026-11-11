@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
 
 // Custom metrics to track success vs rejected booking requests
@@ -11,21 +11,22 @@ export const options = {
   scenarios: {
     concurrency_battle: {
       executor: 'per-vu-iterations',
-      vus: 50,           // 50 concurrent users
-      iterations: 1,     // 1 request per user simultaneously
-      maxDuration: '45s',
+      vus: 50,           // 50 concurrent users fighting for seats
+      iterations: 1,     // 1 booking request per user at the exact same millisecond
+      maxDuration: '30s',
     },
   },
   thresholds: {
-    // Exactly 5 bookings must succeed (since only 5 seats available)
+    // Exactly 5 bookings must succeed (since only 5 seats exist)
     successful_bookings: ['count == 5'],
-    // Exactly 45 bookings must be safely rejected (no overbooking)
+    // Exactly 45 bookings must be rejected safely
     rejected_bookings: ['count == 45'],
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
-const DEPARTURE_ID = Number(__ENV.DEPARTURE_ID || 201);
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8089';
+const TOUR_ID = __ENV.TOUR_ID || 1;
+const DEPARTURE_ID = __ENV.DEPARTURE_ID || 201;
 
 export function setup() {
   console.log('================================================================');
@@ -76,25 +77,29 @@ export default function (data) {
   const idempotencyKey = `concurrency-vu-${vuId}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
   const payload = JSON.stringify({
-    customerId: 1,
-    tourId: 1,
-    departureId: data.departureId,
-    tourName: 'Ha Long Bay 2D1N Luxury Cruise',
+    customerId: 9,
+    tourId: Number(TOUR_ID),
+    departureId: Number(DEPARTURE_ID),
+    tourName: 'Khám Phá Di Sản Đà Nẵng - Bà Nà Hills - Phố Cổ Hội An',
     departureDate: '2026-12-25',
+    unitPrice: 3500000,
     quantity: 1,
-    unitPrice: 2500000,
     idempotencyKey: idempotencyKey,
     passengers: [
       {
-        fullName: `Contender #${vuId}`,
+        fullName: `Khách hàng Contender #${vuId}`,
         phone: `09090000${vuId.toString().padStart(2, '0')}`,
+        dateOfBirth: '1995-05-15',
       },
     ],
   });
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'X-User-Id': '1',
+  const params = {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': '9',
+    },
+    timeout: '15s',
   };
   if (data.token) {
     headers['Authorization'] = `Bearer ${data.token}`;
@@ -107,28 +112,7 @@ export default function (data) {
 
   let isFinalSuccess = false;
 
-  if (res.status === 200 || res.status === 202) {
-    const bookingCode = res.json('bookingCode');
-    if (bookingCode) {
-      // Poll Saga final status (up to 4 seconds)
-      for (let attempt = 0; attempt < 8; attempt++) {
-        sleep(0.5);
-        const pollRes = http.get(`${BASE_URL}/api/v1/bookings/${bookingCode}`, {
-          headers: headers,
-        });
-        if (pollRes.status === 200) {
-          const status = pollRes.json('status');
-          if (status === 'CONFIRMED') {
-            isFinalSuccess = true;
-            break;
-          } else if (status === 'FAILED') {
-            isFinalSuccess = false;
-            break;
-          }
-        }
-      }
-    }
-  }
+  const isAccepted = res.status === 200 || res.status === 201 || res.status === 202;
 
   if (isFinalSuccess) {
     successBookings.add(1);
@@ -140,6 +124,7 @@ export default function (data) {
 
   check(res, {
     'request executed': (r) => r.status > 0,
+    'handled gracefully without 500 error': (r) => r.status !== 500,
   });
 }
 

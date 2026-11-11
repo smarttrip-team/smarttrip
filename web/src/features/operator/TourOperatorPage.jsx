@@ -25,7 +25,20 @@ import {
   Search,
   XCircle,
   Power,
+  Camera,
+  Image as ImageIcon,
 } from 'lucide-react';
+
+const SAMPLE_PRESET_IMAGES = [
+  { name: 'Vịnh Hạ Long', url: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Đà Nẵng', url: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Phú Quốc', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Hà Nội / Hồ Gươm', url: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Hà Tĩnh / Biển', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Sa Pa', url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Nha Trang', url: 'https://images.unsplash.com/photo-1512100356356-de1b84283e18?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Hội An', url: 'https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=800&q=80' },
+];
 
 export default function TourOperatorPage() {
   const { showToast, currentUserId, wallet, refreshWallet } = useAuthWallet();
@@ -609,12 +622,20 @@ export default function TourOperatorPage() {
               >
                 <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-lg bg-slate-100 overflow-hidden shrink-0">
+                    <div
+                      onClick={() => openEditTour(tour)}
+                      className="relative w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 group cursor-pointer border border-slate-200 shadow-xs"
+                      title="Nhấn để đổi hình ảnh hoặc thông tin tour"
+                    >
                       <img
                         src={tour.coverImageUrl || tour.imageUrl || 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80'}
                         alt={tour.title || tour.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                       />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-bold">
+                        <Camera className="w-4 h-4 mb-0.5" />
+                        <span>Đổi ảnh</span>
+                      </div>
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -654,23 +675,34 @@ export default function TourOperatorPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setSelectedTourForDeparture(tour);
-                      const days = tour.durationDays || 3;
-                      setDepartureForm({
-                        departureDate: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0],
-                        returnDate: new Date(Date.now() + 86400000 * (7 + days)).toISOString().split('T')[0],
-                        price: tour.basePrice || 3500000,
-                        totalSeats: 25,
-                      });
-                      setShowAddDepartureModal(true);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors shrink-0"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    <span>Mở lịch khởi hành</span>
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => openEditTour(tour)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-xs"
+                      title="Chỉnh sửa ảnh và thông tin tour"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Sửa ảnh & Tour</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSelectedTourForDeparture(tour);
+                        const days = tour.durationDays || 3;
+                        setDepartureForm({
+                          departureDate: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0],
+                          returnDate: new Date(Date.now() + 86400000 * (7 + days)).toISOString().split('T')[0],
+                          price: tour.basePrice || 3500000,
+                          totalSeats: 25,
+                        });
+                        setShowAddDepartureModal(true);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors shrink-0"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Mở lịch khởi hành</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Departures Table */}
@@ -889,12 +921,49 @@ export default function TourOperatorPage() {
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Mô tả Tour</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={tourForm.description}
                   onChange={(e) => setTourForm({ ...tourForm, description: e.target.value })}
                   placeholder="Mô tả hành trình điểm nổi bật..."
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                 />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Ảnh đại diện Tour (URL)</label>
+                <div className="flex gap-2 items-center">
+                  <div className="w-12 h-12 rounded-lg border border-slate-200 overflow-hidden shrink-0 bg-slate-100">
+                    <img
+                      src={tourForm.coverImageUrl || 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80'}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <input
+                    type="url"
+                    value={tourForm.coverImageUrl}
+                    onChange={(e) => setTourForm({ ...tourForm, coverImageUrl: e.target.value })}
+                    placeholder="Dán link ảnh hoặc chọn nhanh ảnh mẫu..."
+                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-xs font-mono"
+                  />
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1 items-center">
+                  <span className="text-[11px] text-slate-400 font-medium">Chọn nhanh ảnh:</span>
+                  {SAMPLE_PRESET_IMAGES.map((img) => (
+                    <button
+                      type="button"
+                      key={img.name}
+                      onClick={() => setTourForm({ ...tourForm, coverImageUrl: img.url })}
+                      className={`text-[10px] px-2 py-0.5 rounded-md border transition-colors ${
+                        tourForm.coverImageUrl === img.url
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-bold'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {img.name}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t">
@@ -910,6 +979,156 @@ export default function TourOperatorPage() {
                   className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
                 >
                   Xác nhận Tạo Tour
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Chỉnh Sửa Tour & Hình Ảnh */}
+      {showEditTourModal && editingTour && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Camera className="w-5 h-5 text-indigo-600" />
+                <span>Chỉnh Sửa Hình Ảnh & Thông Tin Tour #{editingTour.id}</span>
+              </h2>
+              <button
+                onClick={() => {
+                  setShowEditTourModal(false);
+                  setEditingTour(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateTour} className="space-y-4 text-xs">
+              {/* Image Preview & URL */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Ảnh đại diện Tour (URL hình ảnh)
+                </label>
+                <div className="relative rounded-xl overflow-hidden border border-slate-200 mb-2 h-44 bg-slate-100 flex items-center justify-center">
+                  {editTourForm.coverImageUrl ? (
+                    <img
+                      src={editTourForm.coverImageUrl}
+                      alt="Tour preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src = 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80';
+                      }}
+                    />
+                  ) : (
+                    <div className="text-slate-400 flex flex-col items-center gap-1">
+                      <ImageIcon className="w-8 h-8" />
+                      <span>Chưa có ảnh</span>
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-xs rounded text-[10px] text-white">
+                    Xem trước ảnh hiển thị
+                  </div>
+                </div>
+
+                <input
+                  type="url"
+                  required
+                  value={editTourForm.coverImageUrl}
+                  onChange={(e) => setEditTourForm({ ...editTourForm, coverImageUrl: e.target.value })}
+                  placeholder="Dán liên kết hình ảnh (https://...)"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+                />
+
+                {/* Quick Presets */}
+                <div className="mt-2">
+                  <span className="text-[11px] text-slate-500 font-medium block mb-1">
+                    Hoặc bấm chọn ảnh danh lam thắng cảnh Việt Nam có sẵn:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SAMPLE_PRESET_IMAGES.map((img) => (
+                      <button
+                        type="button"
+                        key={img.name}
+                        onClick={() => setEditTourForm({ ...editTourForm, coverImageUrl: img.url })}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                          editTourForm.coverImageUrl === img.url
+                            ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {img.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Tên Tour Du Lịch</label>
+                <input
+                  type="text"
+                  required
+                  value={editTourForm.title}
+                  onChange={(e) => setEditTourForm({ ...editTourForm, title: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Thời lượng (Số ngày)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editTourForm.durationDays}
+                    onChange={(e) => setEditTourForm({ ...editTourForm, durationDays: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Giá gốc (VND)</label>
+                  <input
+                    type="number"
+                    step="50000"
+                    required
+                    value={editTourForm.basePrice}
+                    onChange={(e) => setEditTourForm({ ...editTourForm, basePrice: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Mô tả Tour</label>
+                <textarea
+                  rows={2}
+                  value={editTourForm.description}
+                  onChange={(e) => setEditTourForm({ ...editTourForm, description: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditTourModal(false);
+                    setEditingTour(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50 font-semibold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Lưu Thay Đổi</span>
                 </button>
               </div>
             </form>

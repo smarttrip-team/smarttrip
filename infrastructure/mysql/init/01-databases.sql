@@ -16,4 +16,8 @@ GRANT ALL PRIVILEGES ON `smarttrip_hotel_db`.* TO 'smarttrip'@'%';
 GRANT ALL PRIVILEGES ON `smarttrip_payment_db`.* TO 'smarttrip'@'%';
 GRANT ALL PRIVILEGES ON `smarttrip_booking_db`.* TO 'smarttrip'@'%';
 
+-- Create and grant tour-service specific user if needed
+CREATE USER IF NOT EXISTS 'smarttrip_user'@'%' IDENTIFIED BY 'smarttrip_secret';
+GRANT ALL PRIVILEGES ON `smarttrip_tour_db`.* TO 'smarttrip_user'@'%';
+
 FLUSH PRIVILEGES;

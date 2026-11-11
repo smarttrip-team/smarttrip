@@ -128,7 +128,7 @@ export const TourListPage = () => {
               duration: t.duration || (t.durationDays ? `${t.durationDays} Ngày ${Math.max(1, t.durationDays - 1)} Đêm` : (rich?.duration || '3N2Đ')),
               durationDays: t.durationDays || rich?.durationDays || 3,
               basePrice: t.basePrice || t.price || rich?.basePrice || 3500000,
-              imageUrl: t.imageUrl || rich?.images?.main || (SEED_TOURS[idx % SEED_TOURS.length] && SEED_TOURS[idx % SEED_TOURS.length].imageUrl),
+              imageUrl: t.coverImageUrl || t.imageUrl || rich?.images?.main || (SEED_TOURS[idx % SEED_TOURS.length] && SEED_TOURS[idx % SEED_TOURS.length].imageUrl),
               rating: rich?.rating || 4.9,
               departures: (t.upcomingDepartures && t.upcomingDepartures.length > 0)
                 ? t.upcomingDepartures

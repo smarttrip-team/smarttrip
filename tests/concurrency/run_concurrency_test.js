@@ -14,7 +14,7 @@ const DEPARTURE_ID = Number(process.env.DEPARTURE_ID || 201);
 const CONCURRENT_REQUESTS = 50;
 const INITIAL_SEATS = 5;
 
-function sendBookingRequest(index) {
+function postRequest(path, payload, token) {
   return new Promise((resolve) => {
     const postData = JSON.stringify({
       customerId: 1,
@@ -35,11 +35,10 @@ function sendBookingRequest(index) {
       ],
     });
 
-    const url = new URL(`${BASE_URL}/api/v1/bookings`);
-    const options = {
+    const req = http.request({
       hostname: url.hostname,
       port: url.port || 80,
-      path: url.pathname,
+      path: url.pathname + url.search,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -75,8 +74,28 @@ function sendBookingRequest(index) {
         message: 'NETWORK_ERROR',
       });
     });
+    req.on('error', err => resolve({ status: 500, error: err.message }));
+    req.end();
+  });
+}
 
-    req.write(postData);
+function patchRequest(path, token) {
+  return new Promise((resolve) => {
+    const url = new URL(`${BASE_URL}${path}`);
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const req = http.request({
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname + url.search,
+      method: 'PATCH',
+      headers: headers,
+      timeout: 10000,
+    }, res => {
+      resolve({ status: res.statusCode });
+    });
+    req.on('error', err => resolve({ status: 500, error: err.message }));
     req.end();
   });
 }

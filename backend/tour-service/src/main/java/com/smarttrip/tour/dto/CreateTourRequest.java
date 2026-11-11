@@ -1,5 +1,6 @@
 package com.smarttrip.tour.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CreateTourRequest {
 
     @NotNull(message = "Destination ID is required")
@@ -30,4 +32,6 @@ public class CreateTourRequest {
     @NotNull(message = "Base price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Base price must be greater than 0")
     private BigDecimal basePrice;
+
+    private String coverImageUrl;
 }

@@ -10,6 +10,8 @@ import '../screens/tour/tour_detail_screen.dart';
 import '../screens/booking/booking_screen.dart';
 import '../screens/operator/operator_dashboard_screen.dart';
 import '../screens/operator/tour_form_screen.dart';
+import '../screens/admin/admin_dashboard_screen.dart';
+import '../screens/admin/user_management_screen.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
   return GoRouter(
@@ -109,12 +111,11 @@ GoRouter createRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: '/admin',
-        builder: (context, state) => _RoleWelcomeScreen(
-          roleTitle: 'Quản trị viên hệ thống (Admin)',
-          color: Colors.red,
-          icon: Icons.admin_panel_settings,
-          authProvider: authProvider,
-        ),
+        builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (context, state) => const UserManagementScreen(),
       ),
       GoRoute(
         path: '/profile',

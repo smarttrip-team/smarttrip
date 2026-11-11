@@ -8,6 +8,8 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/tour/tour_detail_screen.dart';
 import '../screens/booking/booking_screen.dart';
+import '../screens/operator/operator_dashboard_screen.dart';
+import '../screens/operator/tour_form_screen.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
   return GoRouter(
@@ -87,12 +89,14 @@ GoRouter createRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: '/operator',
-        builder: (context, state) => _RoleWelcomeScreen(
-          roleTitle: 'Đối tác Tour (Tour Operator)',
-          color: Colors.orange,
-          icon: Icons.directions_bus,
-          authProvider: authProvider,
-        ),
+        builder: (context, state) => const OperatorDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/operator/tour-form',
+        builder: (context, state) {
+          final tour = state.extra as TourModel?;
+          return TourFormScreen(tour: tour);
+        },
       ),
       GoRoute(
         path: '/hotelier',

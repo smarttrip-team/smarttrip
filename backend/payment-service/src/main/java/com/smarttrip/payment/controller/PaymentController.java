@@ -112,4 +112,19 @@ public class PaymentController {
             @RequestParam(required = false) String reason) {
         return ResponseEntity.ok(paymentService.refund(userId, bookingId, amount, reason));
     }
+
+    @PostMapping("/api/v1/payments/settlement")
+    public ResponseEntity<Map<String, String>> settleBooking(
+            @RequestParam String bookingCode,
+            @RequestParam(required = false, defaultValue = "2") Long operatorId,
+            @RequestParam BigDecimal tourAmount,
+            @RequestParam(required = false, defaultValue = "3") Long hotelierId,
+            @RequestParam(required = false, defaultValue = "0") BigDecimal hotelAmount) {
+        paymentService.settleBooking(bookingCode, operatorId, tourAmount, hotelierId, hotelAmount);
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "message", "Revenue settled: 90% to partners, 10% platform commission retained",
+                "bookingCode", bookingCode
+        ));
+    }
 }

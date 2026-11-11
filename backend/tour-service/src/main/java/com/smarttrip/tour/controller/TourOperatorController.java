@@ -30,6 +30,15 @@ public class TourOperatorController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Update an existing tour (title, price, image, description)")
+    public ResponseEntity<TourResponse> updateTour(
+            @PathVariable("id") Long tourId,
+            @RequestBody CreateTourRequest request) {
+        TourResponse response = tourService.updateTour(tourId, request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/{id}/departures")
     @Operation(summary = "Add a departure schedule to a tour")
     public ResponseEntity<DepartureResponse> addDeparture(

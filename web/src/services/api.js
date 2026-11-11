@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
 // Base API instance pointing to API Gateway
 const API = axios.create({
@@ -24,7 +24,12 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message || error.message || 'Lỗi kết nối máy chủ';
+    const data = error.response?.data;
+    let message = data?.message || error.message || 'Lỗi kết nối máy chủ';
+    if (data?.validationErrors && typeof data.validationErrors === 'object') {
+      const details = Object.values(data.validationErrors).join(', ');
+      if (details) message = message + ": " + details;
+    }
     return Promise.reject(new Error(message));
   }
 );
@@ -45,6 +50,7 @@ export const tourApi = {
 
 export const operatorApi = {
   createTour: (data) => API.post('/api/v1/operator/tours', data),
+  updateTour: (id, data) => API.put(`/api/v1/operator/tours/${id}`, data),
   addDeparture: (tourId, data) => API.post(`/api/v1/operator/tours/${tourId}/departures`, data),
   updateCapacity: (depId, totalSeats, availableSeats) => {
     const params = new URLSearchParams();

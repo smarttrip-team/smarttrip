@@ -13,6 +13,7 @@ import com.smarttrip.tour.repository.TourDepartureRepository;
 import com.smarttrip.tour.repository.TourRepository;
 import com.smarttrip.tour.service.TourService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TourServiceImpl implements TourService {
 
     private final TourRepository tourRepository;
@@ -61,11 +63,44 @@ public class TourServiceImpl implements TourService {
                 .description(request.getDescription())
                 .durationDays(request.getDurationDays())
                 .basePrice(request.getBasePrice())
+                .coverImageUrl(request.getCoverImageUrl())
                 .status(TourStatus.PUBLISHED)
                 .createdBy(operatorId)
                 .build();
 
         Tour saved = tourRepository.save(tour);
+        return toTourResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TourResponse updateTour(Long tourId, CreateTourRequest request) {
+        Tour tour = tourRepository.findById(tourId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tour not found with id: " + tourId));
+
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            tour.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null) {
+            tour.setDescription(request.getDescription());
+        }
+        if (request.getBasePrice() != null) {
+            tour.setBasePrice(request.getBasePrice());
+        }
+        if (request.getDurationDays() != null) {
+            tour.setDurationDays(request.getDurationDays());
+        }
+        if (request.getCoverImageUrl() != null && !request.getCoverImageUrl().isBlank()) {
+            tour.setCoverImageUrl(request.getCoverImageUrl());
+        }
+        if (request.getDestinationId() != null) {
+            Destination destination = destinationRepository.findById(request.getDestinationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Destination not found with id: " + request.getDestinationId()));
+            tour.setDestination(destination);
+        }
+
+        Tour saved = tourRepository.save(tour);
+        log.info("Tour {} updated successfully with image {}", tourId, saved.getCoverImageUrl());
         return toTourResponse(saved);
     }
 
@@ -126,7 +161,6 @@ public class TourServiceImpl implements TourService {
                 .build();
     }
 
-
     @Override
     @Transactional
     public DepartureResponse updateDepartureCapacity(Long departureId, Integer totalSeats, Integer availableSeats) {
@@ -134,9 +168,19 @@ public class TourServiceImpl implements TourService {
                 .orElseThrow(() -> new ResourceNotFoundException("Departure not found with id: " + departureId));
 
         if (totalSeats != null) {
+            if (totalSeats <= 0) {
+                throw new BusinessException("Total seats must be greater than 0");
+            }
             departure.setTotalSeats(totalSeats);
         }
+
         if (availableSeats != null) {
+            if (availableSeats < 0) {
+                throw new BusinessException("Available seats cannot be negative");
+            }
+            if (totalSeats != null && availableSeats > totalSeats) {
+                throw new BusinessException("Available seats cannot exceed total seats");
+            }
             departure.setAvailableSeats(availableSeats);
         }
 
@@ -162,6 +206,7 @@ public class TourServiceImpl implements TourService {
                 .description(tour.getDescription())
                 .durationDays(tour.getDurationDays())
                 .basePrice(tour.getBasePrice())
+                .coverImageUrl(tour.getCoverImageUrl())
                 .status(tour.getStatus().name())
                 .upcomingDepartures(departureResponses)
                 .build();

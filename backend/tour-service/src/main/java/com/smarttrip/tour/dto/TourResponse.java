@@ -20,6 +20,7 @@ public class TourResponse {
     private String description;
     private Integer durationDays;
     private BigDecimal basePrice;
+    private String coverImageUrl;
     private String status;
     private List<DepartureResponse> upcomingDepartures;
 }

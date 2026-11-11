@@ -1,5 +1,6 @@
 package com.smarttrip.booking.service.impl;
 
+import com.smarttrip.booking.client.PaymentFeignClient;
 import com.smarttrip.booking.client.TourFeignClient;
 import com.smarttrip.booking.client.UserFeignClient;
 import com.smarttrip.booking.client.dto.DepartureSnapshotDto;
@@ -40,6 +41,7 @@ public class BookingServiceImpl implements BookingService {
     private final SagaStepRepository sagaStepRepository;
     private final UserFeignClient userFeignClient;
     private final TourFeignClient tourFeignClient;
+    private final PaymentFeignClient paymentFeignClient;
     private final BookingSagaOrchestrator sagaOrchestrator;
 
     @Override
@@ -209,6 +211,58 @@ public class BookingServiceImpl implements BookingService {
         Booking saved = bookingRepository.save(booking);
 
         log.info("Booking {} successfully cancelled by customer {}", bookingCode, customerId);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getAllBookings() {
+        return bookingRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse completeBooking(String bookingCode) {
+        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with code: " + bookingCode));
+
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+            throw new BusinessException("Chỉ đơn hàng CONFIRMED mới có thể hoàn thành tour. Trạng thái hiện tại: " + booking.getStatus());
+        }
+
+        BigDecimal tourSubtotal = booking.getItems().isEmpty()
+                ? booking.getTotalAmount()
+                : booking.getItems().get(0).getSubtotal();
+
+        BigDecimal hotelSubtotal = BigDecimal.ZERO;
+        if (booking.getHotelDetails() != null && !booking.getHotelDetails().isEmpty()) {
+            hotelSubtotal = booking.getHotelDetails().stream()
+                    .map(hd -> hd.getPriceSnapshot() != null
+                            ? hd.getPriceSnapshot().multiply(BigDecimal.valueOf(hd.getRoomQuantity()))
+                            : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        // Trigger settlement to partners (90%) and platform commission (10%)
+        try {
+            paymentFeignClient.settleRevenue(
+                    booking.getBookingCode(),
+                    2L,
+                    tourSubtotal,
+                    3L,
+                    hotelSubtotal
+            );
+        } catch (Exception ex) {
+            log.error("Failed to settle revenue for booking {}: {}", bookingCode, ex.getMessage());
+            throw new BusinessException("Lỗi quyết toán doanh thu với Payment Service: " + ex.getMessage());
+        }
+
+        booking.setStatus("COMPLETED");
+        Booking saved = bookingRepository.save(booking);
+
+        log.info("Booking {} successfully marked COMPLETED and settled 90% to partners, 10% to platform", bookingCode);
         return mapToResponse(saved);
     }
 

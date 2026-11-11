@@ -5,6 +5,7 @@ import { useAuthWallet } from '../../context/AuthWalletContext';
 import {
   Layers,
   PlusCircle,
+  CalendarCheck,
   Wallet,
   ArrowUpRight,
   Calendar,
@@ -27,7 +28,7 @@ import {
 } from 'lucide-react';
 
 export default function TourOperatorPage() {
-  const { showToast, currentUserId, wallet } = useAuthWallet();
+  const { showToast, currentUserId, wallet, refreshWallet } = useAuthWallet();
   const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,6 +81,48 @@ export default function TourOperatorPage() {
     basePrice: 3500000,
     coverImageUrl: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1200&q=80',
   });
+
+  // Booking Completion & Settlement State
+  const [operatorBookings, setOperatorBookings] = useState([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+  const [completingCode, setCompletingCode] = useState(null);
+
+  const fetchOperatorBookings = useCallback(async () => {
+    setLoadingBookings(true);
+    try {
+      const res = await bookingApi.getAllBookings();
+      if (res?.data) {
+        setOperatorBookings(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not load operator bookings:', err);
+    } finally {
+      setLoadingBookings(false);
+    }
+  }, []);
+
+  const handleCompleteBooking = async (bookingCode) => {
+    if (!window.confirm(`Xác nhận khách đã hoàn thành chuyến đi cho đơn ${bookingCode}?\nHệ thống sẽ tự động giải ngân 90% tiền tour và 90% tiền phòng cho đối tác (SmartTrip giữ 10% hoa hồng).`)) {
+      return;
+    }
+
+    setCompletingCode(bookingCode);
+    try {
+      await bookingApi.completeBooking(bookingCode);
+      showToast(`Đã hoàn thành tour ${bookingCode}! Doanh thu 90% đã được chuyển vào ví của bạn và khách sạn.`, 'success');
+      await refreshWallet(currentUserId);
+      await fetchSettlementTransactions();
+      await fetchOperatorBookings();
+    } catch (err) {
+      showToast(`Không thể hoàn thành đơn: ${err.message}`, 'error');
+    } finally {
+      setCompletingCode(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchOperatorBookings();
+  }, [fetchOperatorBookings]);
 
   // Add Departure Form State
   const [departureForm, setDepartureForm] = useState({
@@ -265,7 +308,7 @@ export default function TourOperatorPage() {
                 Ví Doanh Thu Đối Tác: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(wallet?.balance || 0)}
               </h2>
               <p className="text-xs text-teal-200">
-                Doanh thu tour thực nhận 90% được hệ thống tự động quyết toán vào ví ngay khi khách hoàn tất đặt chỗ
+                Tiền tour được giữ an toàn tại SmartTrip Escrow và tự động giải ngân 90% vào ví ngay khi khách hoàn thành chuyến đi
               </p>
             </div>
             <div className="flex items-center gap-2.5">
@@ -369,6 +412,135 @@ export default function TourOperatorPage() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Booking Dispatch & Tour Completion Settlement Tool */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+                <CalendarCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">
+                  Điều Phối Đơn Tour & Xác Nhận Hoàn Thành Chuyến Đi (Xong Tour $\rightarrow$ Chia Tiền)
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Khi khách kết thúc tour, bấm "Xác Nhận Hoàn Thành" để kích hoạt giải ngân tự động 90% tiền tour và 90% tiền phòng cho đối tác
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={fetchOperatorBookings}
+              disabled={loadingBookings}
+              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-teal-600 font-medium px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 transition-colors shadow-xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingBookings ? 'animate-spin' : ''}`} />
+              Làm mới đơn đặt chỗ
+            </button>
+          </div>
+
+          {loadingBookings ? (
+            <div className="py-8 text-center text-xs text-slate-400 flex justify-center items-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-teal-600" />
+              Đang tải danh sách đơn đặt chỗ...
+            </div>
+          ) : operatorBookings.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">
+              Chưa có đơn đặt tour nào trong hệ thống. Hãy dùng tài khoản Khách hàng để đặt tour trải nghiệm!
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Mã đơn (Booking)</th>
+                    <th className="px-4 py-3 font-semibold">Khách hàng</th>
+                    <th className="px-4 py-3 font-semibold">Dịch vụ Tour & Khách sạn</th>
+                    <th className="px-4 py-3 font-semibold">Tổng tiền</th>
+                    <th className="px-4 py-3 font-semibold">Trạng thái</th>
+                    <th className="px-4 py-3 font-semibold text-right">Thao tác Quyết toán</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {operatorBookings.slice(0, 8).map((b) => {
+                    const isConfirmed = b.status?.toUpperCase() === 'CONFIRMED';
+                    const isCompleted = b.status?.toUpperCase() === 'COMPLETED';
+                    const isCancelled = b.status?.toUpperCase() === 'CANCELLED';
+                    const primaryPassenger = b.passengers && b.passengers.length > 0 ? b.passengers[0] : null;
+                    const tourItem = b.items && b.items.length > 0 ? b.items[0] : null;
+
+                    return (
+                      <tr key={b.id || b.bookingCode} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-4 py-3 font-mono font-bold text-slate-800">
+                          {b.bookingCode}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-800">{primaryPassenger?.fullName || 'Khách hàng #' + b.customerId}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{primaryPassenger?.phone || '—'}</div>
+                        </td>
+                        <td className="px-4 py-3 max-w-xs">
+                          <div className="font-medium text-slate-800 truncate">{tourItem?.tourNameSnapshot || 'Tour SmartTrip'}</div>
+                          <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
+                            <span>Khởi hành: {tourItem?.departureDateSnapshot || '—'}</span>
+                            {b.hotelDetails && b.hotelDetails.length > 0 && (
+                              <span className="text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                + Kèm phòng KS
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-bold text-slate-900">
+                          {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(b.totalAmount || 0)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {isConfirmed && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                              <Clock className="w-3 h-3 text-sky-600" /> ĐÃ ĐẶT (CHỜ ĐI TOUR)
+                            </span>
+                          )}
+                          {isCompleted && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> ĐÃ XONG TOUR (ĐÃ CHIA TIỀN)
+                            </span>
+                          )}
+                          {isCancelled && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              <XCircle className="w-3 h-3 text-slate-400" /> ĐÃ HỦY ĐƠN
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {isConfirmed && (
+                            <button
+                              type="button"
+                              onClick={() => handleCompleteBooking(b.bookingCode)}
+                              disabled={completingCode === b.bookingCode}
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors inline-flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {completingCode === b.bookingCode ? 'Đang giải ngân...' : 'Xác Nhận Xong Tour (Nhận 90%)'}
+                            </button>
+                          )}
+                          {isCompleted && (
+                            <span className="text-[11px] font-semibold text-emerald-600">
+                              Tiền 90% đã vào ví
+                            </span>
+                          )}
+                          {isCancelled && (
+                            <span className="text-[11px] text-slate-400">
+                              Đã hoàn tiền khách
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

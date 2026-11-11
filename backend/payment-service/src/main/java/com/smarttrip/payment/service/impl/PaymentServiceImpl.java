@@ -198,10 +198,9 @@ public class PaymentServiceImpl implements PaymentService {
                     paymentAuthorizationRepository.save(auth);
                 });
 
-        // Trigger automatic revenue settlement with 10% platform fee
-        settleBooking(bookingId, operatorId, tourAmount, hotelierId, hotelAmount);
-
-        log.info("Captured payment and settled revenues for booking {}: amount={}, remaining customer balance={}",
+        // Money is safely held in Platform Escrow pending tour completion.
+        // Partner settlement (90/10) will be triggered when the trip is marked COMPLETED.
+        log.info("Captured customer payment into Platform Escrow for booking {}: amount={}, remaining customer balance={}",
                 bookingId, amount, wallet.getBalance());
 
         return mapPaymentToResponse(savedPayment);

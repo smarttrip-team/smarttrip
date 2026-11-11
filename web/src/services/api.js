@@ -82,6 +82,8 @@ export const bookingApi = {
   getBookingByCode: (bookingCode) => API.get(`/api/v1/bookings/${bookingCode}`),
   getSagaStatus: (bookingCode) => API.get(`/api/v1/bookings/${bookingCode}/saga`),
   getCustomerBookings: (customerId) => API.get(`/api/v1/bookings?customerId=${customerId}`),
+  getAllBookings: () => API.get('/api/v1/bookings/all'),
+  completeBooking: (bookingCode) => API.post(`/api/v1/bookings/${bookingCode}/complete`),
   cancelBooking: (bookingCode) => API.post(`/api/v1/bookings/${bookingCode}/cancel`),
 };
 

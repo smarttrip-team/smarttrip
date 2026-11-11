@@ -1,8 +1,12 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'database/database_helper.dart';
+import 'providers/auth_provider.dart';
+import 'routes/app_router.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,41 +28,22 @@ class SmartTripApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SmartTrip Mobile Core',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0288D1)),
-      ),
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('SmartTrip Mobile - SQLite Core'),
-          backgroundColor: const Color(0xFF0288D1),
-          foregroundColor: Colors.white,
-        ),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle_outline, color: Colors.green, size: 64),
-                SizedBox(height: 16),
-                Text(
-                  'SmartTrip Mobile Core Initialized',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'CSDL SQLite 6 bảng & Auto-seeding 4 vai trò đã sẵn sàng!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
+      child: Builder(
+        builder: (context) {
+          final authProvider = context.watch<AuthProvider>();
+          final router = createRouter(authProvider);
+
+          return MaterialApp.router(
+            title: 'SmartTrip Mobile',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            routerConfig: router,
+          );
+        },
       ),
     );
   }

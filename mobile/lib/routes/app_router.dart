@@ -7,6 +7,7 @@ import '../providers/tour_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/tour/tour_detail_screen.dart';
+import '../screens/booking/booking_screen.dart';
 
 GoRouter createRouter(AuthProvider authProvider) {
   return GoRouter(
@@ -54,6 +55,35 @@ GoRouter createRouter(AuthProvider authProvider) {
           final tour = state.extra as TourModel;
           return TourDetailScreen(tour: tour);
         },
+      ),
+      GoRoute(
+        path: '/booking',
+        builder: (context, state) {
+          final tour = state.extra as TourModel;
+          return BookingScreen(tour: tour);
+        },
+      ),
+      GoRoute(
+        path: '/bookings',
+        builder: (context, state) => Scaffold(
+          appBar: AppBar(title: const Text('Vé Của Tôi')),
+          body: const Center(
+            child: Text(
+              'Đặt tour thành công!\nVé đã được lưu an toàn vào CSDL SQLite.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/wallet',
+        builder: (context, state) => Scaffold(
+          appBar: AppBar(title: const Text('Ví Điện Tử')),
+          body: const Center(
+            child: Text('Thông tin Ví Điện Tử'),
+          ),
+        ),
       ),
       GoRoute(
         path: '/operator',
@@ -154,10 +184,9 @@ class _RoleWelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Nút xem chi tiết tour mẫu
               if (tourProvider.tours.isNotEmpty) ...[
                 const Text(
-                  'Tour mẫu sẵn sàng trải nghiệm:',
+                  'Bấm vào để trải nghiệm Đặt Tour & Trừ Ví:',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 const SizedBox(height: 10),
@@ -166,7 +195,7 @@ class _RoleWelcomeScreen extends StatelessWidget {
                   child: ListTile(
                     leading: const Icon(Icons.travel_explore, color: Colors.blue),
                     title: Text(tourProvider.tours.first.title),
-                    subtitle: Text('${tourProvider.tours.first.destination} • ${tourProvider.tours.first.duration}'),
+                    subtitle: Text('${tourProvider.tours.first.destination} • Bấm để đặt tour'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () {
                       context.push('/tour/${tourProvider.tours.first.id}', extra: tourProvider.tours.first);

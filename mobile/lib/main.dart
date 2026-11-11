@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'database/database_helper.dart';
 import 'providers/auth_provider.dart';
+import 'providers/hotel_provider.dart';
+import 'providers/tour_provider.dart';
 import 'routes/app_router.dart';
 import 'theme/app_theme.dart';
 
@@ -31,6 +33,8 @@ class SmartTripApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => TourProvider()),
+        ChangeNotifierProvider(create: (_) => HotelProvider()),
       ],
       child: Builder(
         builder: (context) {

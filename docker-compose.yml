@@ -28,6 +28,24 @@ services:
       --collation-server=utf8mb4_unicode_ci
 
   # ==========================================
+  # 1.1. DATABASE - MICROSOFT SQL SERVER 2022 (Payment Service)
+  # ==========================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: smarttrip-sqlserver
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-SmartTrip@Pwd2026!}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - smarttrip-network
+
+  # ==========================================
   # 2. MESSAGE BROKER (RabbitMQ 3.13)
   # ==========================================
   rabbitmq:
@@ -173,17 +191,19 @@ services:
     ports:
       - "8084:8084"
     depends_on:
-      mysql:
-        condition: service_healthy
+      sqlserver:
+        condition: service_started
       rabbitmq:
         condition: service_healthy
       discovery-service:
         condition: service_started
     environment:
       SERVER_PORT: 8084
-      PAYMENT_DB_URL: jdbc:mysql://mysql:3306/smarttrip_payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      DB_USER: root
-      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-smarttrip_root_pwd}
+      PAYMENT_DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=smarttrip_payment_db;encrypt=false;trustServerCertificate=true
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD:-SmartTrip@Pwd2026!}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-smarttrip}
@@ -265,6 +285,8 @@ volumes:
   mysql_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  sqlserver_data:
     driver: local
 
 networks:

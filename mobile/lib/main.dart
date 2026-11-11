@@ -7,6 +7,8 @@ import 'database/database_helper.dart';
 import 'providers/auth_provider.dart';
 import 'providers/hotel_provider.dart';
 import 'providers/tour_provider.dart';
+import 'providers/booking_provider.dart';
+import 'providers/wallet_provider.dart';
 import 'routes/app_router.dart';
 import 'theme/app_theme.dart';
 
@@ -35,6 +37,8 @@ class SmartTripApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => TourProvider()),
         ChangeNotifierProvider(create: (_) => HotelProvider()),
+        ChangeNotifierProvider(create: (_) => BookingProvider()),
+        ChangeNotifierProvider(create: (_) => WalletProvider()),
       ],
       child: Builder(
         builder: (context) {

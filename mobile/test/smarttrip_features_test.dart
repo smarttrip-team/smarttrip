@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smarttrip_mobile/database/database_helper.dart';
 import 'package:smarttrip_mobile/models/hotel_model.dart';
 import 'package:smarttrip_mobile/models/tour_model.dart';
-import 'package:smarttrip_mobile/models/user_model.dart';
 import 'package:smarttrip_mobile/providers/auth_provider.dart';
 import 'package:smarttrip_mobile/providers/tour_provider.dart';
 import 'package:smarttrip_mobile/providers/hotel_provider.dart';

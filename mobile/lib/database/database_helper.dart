@@ -16,6 +16,31 @@ class DatabaseHelper {
 
   DatabaseHelper._init();
 
+  @visibleForTesting
+  Future<void> initInMemoryForTesting() async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+    _database = await databaseFactory.openDatabase(
+      inMemoryDatabasePath,
+      options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: _createDB,
+      ),
+    );
+  }
+
+  @visibleForTesting
+  Future<void> closeForTesting() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB('smarttrip.db');

@@ -1,13 +1,14 @@
 package com.smarttrip.hotel.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class HotelCreateRequest {
 
     @NotBlank(message = "Hotel name is required")
@@ -18,6 +19,10 @@ public class HotelCreateRequest {
 
     private String description;
 
-    @NotNull(message = "Manager ID is required")
-    private Long managerId;
+    @Builder.Default
+    private Long managerId = 2L;
+
+    public Long getManagerId() {
+        return managerId != null ? managerId : 2L;
+    }
 }

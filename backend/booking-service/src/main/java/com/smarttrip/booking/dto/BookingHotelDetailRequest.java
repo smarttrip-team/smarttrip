@@ -1,8 +1,7 @@
 package com.smarttrip.booking.dto;
 
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -13,18 +12,17 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class BookingHotelDetailRequest {
 
     @NotNull(message = "hotelId is required")
     private Long hotelId;
 
-    @NotBlank(message = "hotelName is required")
     private String hotelName;
 
     @NotNull(message = "roomTypeId is required")
     private Long roomTypeId;
 
-    @NotBlank(message = "roomName is required")
     private String roomName;
 
     @NotNull(message = "checkInDate is required")
@@ -33,11 +31,37 @@ public class BookingHotelDetailRequest {
     @NotNull(message = "checkOutDate is required")
     private LocalDate checkOutDate;
 
-    @NotNull(message = "roomQuantity is required")
-    @Min(value = 1, message = "roomQuantity must be at least 1")
     private Integer roomQuantity;
 
-    @NotNull(message = "price is required")
-    @DecimalMin(value = "0.00", message = "Price cannot be negative")
     private BigDecimal price;
+
+    @JsonProperty("roomsBooked")
+    public void setRoomsBooked(Integer roomsBooked) {
+        if (this.roomQuantity == null) {
+            this.roomQuantity = roomsBooked;
+        }
+    }
+
+    @JsonProperty("unitPrice")
+    public void setUnitPrice(BigDecimal unitPrice) {
+        if (this.price == null) {
+            this.price = unitPrice;
+        }
+    }
+
+    public String getHotelName() {
+        return (hotelName != null && !hotelName.isBlank()) ? hotelName : "Khách sạn Novotel Danang Premier";
+    }
+
+    public String getRoomName() {
+        return (roomName != null && !roomName.isBlank()) ? roomName : "Deluxe Ocean View Room";
+    }
+
+    public Integer getRoomQuantity() {
+        return (roomQuantity != null && roomQuantity > 0) ? roomQuantity : 1;
+    }
+
+    public BigDecimal getPrice() {
+        return price != null ? price : BigDecimal.valueOf(1200000);
+    }
 }

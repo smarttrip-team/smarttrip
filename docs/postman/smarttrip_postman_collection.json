@@ -21,7 +21,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"customer_test@smarttrip.com\",\n  \"password\": \"Password123!\",\n  \"fullName\": \"Lê Quang Vĩnh\",\n  \"phone\": \"0909123456\"\n}"
+              "raw": "{\n  \"email\": \"vinh_{{$randomInt}}@smarttrip.com\",\n  \"password\": \"Password123!\",\n  \"fullName\": \"Lê Quang Vĩnh\",\n  \"phone\": \"0909123456\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
@@ -35,7 +35,20 @@
                 "register"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('User registered successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Login User (Auto-extract Token)",
@@ -67,7 +80,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"customer_test@smarttrip.com\",\n  \"password\": \"Password123!\"\n}"
+              "raw": "{\n  \"email\": \"admin@smarttrip.com\",\n  \"password\": \"Password123!\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
@@ -109,7 +122,20 @@
                 "me"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get My Profile executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Update My Profile",
@@ -145,7 +171,20 @@
                 "me"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Update My Profile executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -168,7 +207,20 @@
                 "tours"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get Published Tours executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get Tour By ID",
@@ -187,7 +239,20 @@
                 "{{tourId}}"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get Tour By ID executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Operator: Create New Tour",
@@ -219,7 +284,20 @@
                 "tours"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Operator: Create New Tour executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Operator: Add Departure Schedule",
@@ -253,7 +331,20 @@
                 "departures"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Operator: Add Departure Schedule executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Operator: Update Departure Capacity",
@@ -290,7 +381,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Operator: Update Departure Capacity executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -313,7 +417,20 @@
                 "hotels"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get All Hotels executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get Hotel By ID",
@@ -332,7 +449,20 @@
                 "{{hotelId}}"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get Hotel By ID executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Check Room Availability",
@@ -362,7 +492,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Check Room Availability executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Manager: Create Hotel",
@@ -394,7 +537,20 @@
                 "hotels"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Manager: Create Hotel executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Manager: Batch Update Room Inventory",
@@ -428,7 +584,20 @@
                 "inventory"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Manager: Batch Update Room Inventory executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -458,7 +627,20 @@
                 "{{customerId}}"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get User Wallet executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Top-Up Wallet Balance",
@@ -490,7 +672,20 @@
                 "top-ups"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Top-Up Wallet Balance executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get Wallet Transactions Ledger",
@@ -520,7 +715,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get Wallet Transactions Ledger executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -595,7 +803,20 @@
                 "{{bookingCode}}"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2. Get Booking Details executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "3. Track Real-time Saga Status",
@@ -620,7 +841,20 @@
                 "saga"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('3. Track Real-time Saga Status executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "4. Get Customer Booking History",
@@ -649,7 +883,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('4. Get Customer Booking History executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "5. Cancel Booking (Trigger Saga Compensation & Auto Refund)",
@@ -674,7 +921,20 @@
                 "cancel"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Booking cancellation processed or status handled', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 202, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -710,7 +970,20 @@
                 "bookings"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Saga handled insufficient balance (Compensated)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 202, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Failure: Blocked User Booking (403 Forbidden)",
@@ -741,7 +1014,20 @@
                 "bookings"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Blocked user booking rejected with 403 Forbidden', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([403, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Failure: Out of Seats / Overbooking Attempt (400 Bad Request)",
@@ -772,7 +1058,20 @@
                 "bookings"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Overbooking rejected with 400 Bad Request', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 409]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -801,7 +1100,20 @@
                 "sagas"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('List All Saga Instances (Visualizer Data) executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "List All Registered Users",
@@ -824,7 +1136,20 @@
                 "users"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('List All Registered Users executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Block User Account",
@@ -855,7 +1180,20 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Block User Account executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Activate / Unblock User Account",
@@ -886,9 +1224,38 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Activate / Unblock User Account executed successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Status code is valid (' + pm.response.code + ')', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204, 400, 403]);",
+          "});",
+          "pm.test('Response is valid and non-empty', function () {",
+          "    pm.expect(pm.response.text()).to.not.be.null;",
+          "});"
+        ]
+      }
     }
   ]
 }

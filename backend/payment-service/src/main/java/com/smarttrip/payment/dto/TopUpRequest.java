@@ -1,5 +1,6 @@
 package com.smarttrip.payment.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -10,6 +11,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TopUpRequest {
 
     private Long userId;
@@ -19,4 +21,6 @@ public class TopUpRequest {
     private BigDecimal amount;
 
     private String idempotencyKey;
+
+    private String paymentMethod;
 }

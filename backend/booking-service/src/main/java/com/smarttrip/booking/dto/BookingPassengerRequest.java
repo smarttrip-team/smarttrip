@@ -1,6 +1,5 @@
 package com.smarttrip.booking.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
@@ -10,7 +9,6 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class BookingPassengerRequest {
 
     @NotBlank(message = "Passenger full name is required")
@@ -19,6 +17,4 @@ public class BookingPassengerRequest {
     private String phone;
 
     private LocalDate dateOfBirth;
-
-    private String passengerType;
 }

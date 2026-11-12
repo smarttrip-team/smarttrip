@@ -64,7 +64,7 @@ export const AppRouter = () => {
             <Route
               path="/wallet"
               element={
-                <ProtectedRoute allowedRoles={['ROLE_CUSTOMER', 'ROLE_ADMIN']}>
+                <ProtectedRoute allowedRoles={['ROLE_CUSTOMER', 'ROLE_TOUR_OPERATOR', 'ROLE_HOTEL_MANAGER', 'ROLE_ADMIN']}>
                   <WalletPage />
                 </ProtectedRoute>
               }
@@ -151,3 +151,4 @@ export const AppRouter = () => {
 };
 
 export default AppRouter;
+

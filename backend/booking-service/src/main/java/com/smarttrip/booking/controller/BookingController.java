@@ -43,7 +43,6 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBookingByCode(bookingCode));
     }
 
-
     @GetMapping({"/api/v1/bookings/sagas", "/api/v1/bookings/saga/all", "/api/v1/admin/sagas"})
     public ResponseEntity<List<SagaStatusResponse>> getAllSagas() {
         return ResponseEntity.ok(bookingService.getAllSagas());
@@ -52,6 +51,11 @@ public class BookingController {
     @GetMapping({"/api/v1/bookings/{bookingCode}/saga", "/api/bookings/{bookingCode}/saga"})
     public ResponseEntity<SagaStatusResponse> getSagaStatus(@PathVariable String bookingCode) {
         return ResponseEntity.ok(bookingService.getSagaStatusByBookingCode(bookingCode));
+    }
+
+    @GetMapping({"/api/v1/bookings/all", "/api/v1/operator/bookings"})
+    public ResponseEntity<List<BookingResponse>> getAllBookings() {
+        return ResponseEntity.ok(bookingService.getAllBookings());
     }
 
     @GetMapping("/api/v1/bookings")
@@ -68,6 +72,12 @@ public class BookingController {
     @GetMapping("/api/bookings/customer/{customerId}")
     public ResponseEntity<List<BookingResponse>> getBookingsByCustomerId(@PathVariable Long customerId) {
         return ResponseEntity.ok(bookingService.getBookingsByCustomerId(customerId));
+    }
+
+    @PostMapping({"/api/v1/bookings/{bookingCode}/complete", "/api/bookings/{bookingCode}/complete"})
+    public ResponseEntity<BookingResponse> completeBooking(@PathVariable String bookingCode) {
+        BookingResponse response = bookingService.completeBooking(bookingCode);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping({"/api/v1/bookings/{bookingCode}/cancel", "/api/bookings/{bookingCode}/cancel"})

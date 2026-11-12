@@ -1,47 +1,57 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'app/theme/app_theme.dart';
-import 'app/router/app_router.dart';
-import 'core/storage/session_storage.dart';
-import 'core/providers/auth_provider.dart';
-import 'core/providers/tour_provider.dart';
-import 'core/providers/wallet_provider.dart';
-import 'core/providers/booking_provider.dart';
-import 'core/providers/hotel_provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'database/database_helper.dart';
+import 'providers/auth_provider.dart';
+import 'providers/hotel_provider.dart';
+import 'providers/tour_provider.dart';
+import 'providers/booking_provider.dart';
+import 'providers/wallet_provider.dart';
+import 'routes/app_router.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SessionStorage.init();
-  final authProvider = AuthProvider();
-  runApp(SmartTripApp(authProvider: authProvider));
+
+  // Khởi tạo FFI cho SQLite trên Windows/Linux desktop
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  // Khởi tạo trước database & auto-seed dữ liệu mẫu
+  await DatabaseHelper.instance.database;
+
+  runApp(const SmartTripApp());
 }
 
-class SmartTripApp extends StatefulWidget {
-  final AuthProvider authProvider;
-  const SmartTripApp({super.key, required this.authProvider});
-
-  @override
-  State<SmartTripApp> createState() => _SmartTripAppState();
-}
-
-class _SmartTripAppState extends State<SmartTripApp> {
-  late final _router = createAppRouter(widget.authProvider);
+class SmartTripApp extends StatelessWidget {
+  const SmartTripApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AuthProvider>.value(value: widget.authProvider),
-        ChangeNotifierProvider<TourProvider>(create: (_) => TourProvider()),
-        ChangeNotifierProvider<WalletProvider>(create: (_) => WalletProvider()),
-        ChangeNotifierProvider<BookingProvider>(create: (_) => BookingProvider()),
-        ChangeNotifierProvider<HotelProvider>(create: (_) => HotelProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => TourProvider()),
+        ChangeNotifierProvider(create: (_) => HotelProvider()),
+        ChangeNotifierProvider(create: (_) => BookingProvider()),
+        ChangeNotifierProvider(create: (_) => WalletProvider()),
       ],
-      child: MaterialApp.router(
-        title: 'SmartTrip Mobile',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        routerConfig: _router,
+      child: Builder(
+        builder: (context) {
+          final authProvider = context.watch<AuthProvider>();
+          final router = createRouter(authProvider);
+
+          return MaterialApp.router(
+            title: 'SmartTrip Mobile',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            routerConfig: router,
+          );
+        },
       ),
     );
   }

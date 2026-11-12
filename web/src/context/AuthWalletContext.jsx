@@ -4,33 +4,87 @@ import { walletApi, authApi } from '../services/api';
 const AuthWalletContext = createContext(null);
 
 export const PRESET_USERS = [
-  { id: 10, name: 'Lê Quang Vĩnh', email: 'vinhle@smarttrip.com', role: 'ROLE_CUSTOMER', roleLabel: 'Customer' },
-  { id: 1, name: 'Nguyễn Hồng Thái (Operator)', email: 'operator@smarttrip.com', role: 'ROLE_TOUR_OPERATOR', roleLabel: 'Tour Operator' },
-  { id: 6, name: 'Trần Quốc Bảo (Tour Manager)', email: 'tourmanager2@smarttrip.com', role: 'ROLE_TOUR_OPERATOR', roleLabel: 'Tour Manager 2' },
-  { id: 2, name: 'Khách sạn Mường Thanh (Manager)', email: 'hotelier@smarttrip.com', role: 'ROLE_HOTEL_MANAGER', roleLabel: 'Hotel Manager' },
-  { id: 7, name: 'Lê Thu Trang (Hotel Manager)', email: 'hotelmanager2@smarttrip.com', role: 'ROLE_HOTEL_MANAGER', roleLabel: 'Hotel Manager 2' },
-  { id: 3, name: 'Hệ thống Quản trị (Admin)', email: 'admin@smarttrip.com', role: 'ROLE_ADMIN', roleLabel: 'Admin' },
+  {
+    id: 5,
+    name: 'Nguyễn Hồng Thái (Customer)',
+    email: 'thai@gmail.com',
+    role: 'ROLE_CUSTOMER',
+    roleLabel: 'Customer',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGFpQGdtYWlsLmNvbSIsInVzZXJJZCI6NSwicm9sZXMiOlsiUk9MRV9DVVNUT01FUiJdLCJpYXQiOjE3OTQzNDIzMTIsImV4cCI6MTgyNTg3ODMxMn0._uFYv3Xb5ikZ0On-EI-74H6up0HGKbg-Hl6MUM0F514'
+  },
+  {
+    id: 2,
+    name: 'Nguyễn Hồng Thái (Operator)',
+    email: 'operator@smarttrip.com',
+    role: 'ROLE_TOUR_OPERATOR',
+    roleLabel: 'Tour Operator',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvcGVyYXRvckBzbWFydHRyaXAuY29tIiwidXNlcklkIjoyLCJyb2xlcyI6WyJST0xFX1RPVVJfT1BFUkFUT1IiXSwiaWF0IjoxNzk0MzQyMzEyLCJleHAiOjE4MjU4NzgzMTJ9.Fd8_nG51a3Ip8NKHKEXpW-BqL99IJ34PmyT57MFCkpc'
+  },
+  {
+    id: 6,
+    name: 'Trần Quốc Bảo (Tour Manager)',
+    email: 'tourmanager2@smarttrip.com',
+    role: 'ROLE_TOUR_OPERATOR',
+    roleLabel: 'Tour Manager 2',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0b3VybWFuYWdlcjJAc21hcnR0cmlwLmNvbSIsInVzZXJJZCI6Niwicm9sZXMiOlsiUk9MRV9UT1VSX09QRVJBVE9SIl0sImlhdCI6MTc5NDM0MjMxMiwiZXhwIjoxODI1ODc4MzEyfQ.LWQCGVnxB_j-XPXYbzRr9fc_PdhsnmJzE60mcnMgikg'
+  },
+  {
+    id: 3,
+    name: 'Khách sạn Mường Thanh (Manager)',
+    email: 'hotelier@smarttrip.com',
+    role: 'ROLE_HOTEL_MANAGER',
+    roleLabel: 'Hotel Manager',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJob3RlbGllckBzbWFydHRyaXAuY29tIiwidXNlcklkIjozLCJyb2xlcyI6WyJST0xFX0hPVEVMX01BTkFHRVIiXSwiaWF0IjoxNzk0MzQyMzEyLCJleHAiOjE4MjU4NzgzMTJ9.Y022Ek60-L-4bTNK_L1hjHe79J1YJzQ03rgQ_XXE8Jo'
+  },
+  {
+    id: 7,
+    name: 'Lê Thu Trang (Hotel Manager)',
+    email: 'hotelmanager2@smarttrip.com',
+    role: 'ROLE_HOTEL_MANAGER',
+    roleLabel: 'Hotel Manager 2',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJob3RlbG1hbmFnZXIyQHNtYXJ0dHJpcC5jb20iLCJ1c2VySWQiOjcsInJvbGVzIjpbIlJPTEVfSE9URUxfTUFOQUdFUiJdLCJpYXQiOjE3OTQzNDIzMTIsImV4cCI6MTgyNTg3ODMxMn0.Tw2g3U1FAw4UK-ulEpkI-hz1vcus-8sxddJZT189cMY'
+  },
+  {
+    id: 4,
+    name: 'Hệ thống Quản trị (Admin)',
+    email: 'admin@smarttrip.com',
+    role: 'ROLE_ADMIN',
+    roleLabel: 'Admin',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBzbWFydHRyaXAuY29tIiwidXNlcklkIjo0LCJyb2xlcyI6WyJST0xFX0FETUlOIl0sImlhdCI6MTc5NDM0MjMxMiwiZXhwIjoxODI1ODc4MzEyfQ.LFauzf_HZiIuRnL0uRS76vBhboH5HCQVri3NiGQyK3Q'
+  },
 ];
 
 export const AuthWalletProvider = ({ children }) => {
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem('smarttrip_token') || null;
+  const [currentUserEmail, setCurrentUserEmail] = useState(() => {
+    return localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
   });
 
   const [currentUserId, setCurrentUserId] = useState(() => {
-    return Number(localStorage.getItem('smarttrip_user_id')) || 10;
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched) return matched.id;
+    return Number(localStorage.getItem('smarttrip_user_id')) || 5;
   });
 
   const [currentUserName, setCurrentUserName] = useState(() => {
-    return localStorage.getItem('smarttrip_user_name') || 'Lê Quang Vĩnh';
-  });
-
-  const [currentUserEmail, setCurrentUserEmail] = useState(() => {
-    return localStorage.getItem('smarttrip_user_email') || 'vinhle@smarttrip.com';
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched) return matched.name;
+    return localStorage.getItem('smarttrip_user_name') || 'Nguyễn Hồng Thái';
   });
 
   const [currentRole, setCurrentRole] = useState(() => {
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched) return matched.role;
     return localStorage.getItem('smarttrip_user_role') || 'ROLE_CUSTOMER';
+  });
+
+  const [token, setToken] = useState(() => {
+    const email = localStorage.getItem('smarttrip_user_email') || 'thai@gmail.com';
+    const matched = PRESET_USERS.find((u) => u.email === email);
+    if (matched && matched.token) return matched.token;
+    return localStorage.getItem('smarttrip_token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGFpQGdtYWlsLmNvbSIsInVzZXJJZCI6NSwicm9sZXMiOlsiUk9MRV9DVVNUT01FUiJdLCJpYXQiOjE3OTQzNDIzMTIsImV4cCI6MTgyNTg3ODMxMn0._uFYv3Xb5ikZ0On-EI-74H6up0HGKbg-Hl6MUM0F514';
   });
 
   const [roles, setRoles] = useState(() => {
@@ -78,6 +132,31 @@ export const AuthWalletProvider = ({ children }) => {
     }
   }, [currentUserId]);
 
+  // Auto-heal and keep user ID / token strictly in sync with PRESET_USERS
+  useEffect(() => {
+    const matched = PRESET_USERS.find((u) => u.email === currentUserEmail);
+    if (matched) {
+      if (currentUserId !== matched.id) {
+        setCurrentUserId(matched.id);
+        localStorage.setItem('smarttrip_user_id', String(matched.id));
+      }
+      if (token !== matched.token) {
+        setToken(matched.token);
+        localStorage.setItem('smarttrip_token', matched.token);
+      }
+      if (currentUserName !== matched.name) {
+        setCurrentUserName(matched.name);
+        localStorage.setItem('smarttrip_user_name', matched.name);
+      }
+      if (currentRole !== matched.role) {
+        setCurrentRole(matched.role);
+        setRoles([matched.role]);
+        localStorage.setItem('smarttrip_user_role', matched.role);
+        localStorage.setItem('smarttrip_roles', JSON.stringify([matched.role]));
+      }
+    }
+  }, [currentUserEmail, currentUserId, token, currentUserName, currentRole]);
+
   useEffect(() => {
     localStorage.setItem('smarttrip_user_id', String(currentUserId));
     localStorage.setItem('smarttrip_user_name', currentUserName);
@@ -87,9 +166,7 @@ export const AuthWalletProvider = ({ children }) => {
     if (token) {
       localStorage.setItem('smarttrip_token', token);
     }
-    if (currentRole === 'ROLE_CUSTOMER') {
-      refreshWallet(currentUserId);
-    }
+    refreshWallet(currentUserId);
   }, [currentUserId, currentUserName, currentUserEmail, currentRole, roles, token, refreshWallet]);
 
   // Login handler
@@ -184,6 +261,10 @@ export const AuthWalletProvider = ({ children }) => {
       const roleStr = userOrId.role || 'ROLE_CUSTOMER';
       setCurrentRole(roleStr);
       setRoles([roleStr]);
+      if (userOrId.token) {
+        setToken(userOrId.token);
+        localStorage.setItem('smarttrip_token', userOrId.token);
+      }
       showToast(`Đã chuyển vai trò: ${userOrId.roleLabel || roleStr} (${userOrId.name})`, 'info');
       return;
     }
@@ -198,6 +279,10 @@ export const AuthWalletProvider = ({ children }) => {
     const targetRole = newRole || (matched ? matched.role : 'ROLE_CUSTOMER');
     setCurrentRole(targetRole);
     setRoles(Array.isArray(targetRole) ? targetRole : [targetRole]);
+    if (matched?.token) {
+      setToken(matched.token);
+      localStorage.setItem('smarttrip_token', matched.token);
+    }
     showToast(`Đã chuyển sang tài khoản ID: ${id} (${newName || matched?.name || 'User ' + id})`, 'info');
   };
 
@@ -209,6 +294,10 @@ export const AuthWalletProvider = ({ children }) => {
       setCurrentUserId(matched.id);
       setCurrentUserName(matched.name);
       if (matched.email) setCurrentUserEmail(matched.email);
+      if (matched.token) {
+        setToken(matched.token);
+        localStorage.setItem('smarttrip_token', matched.token);
+      }
     }
     showToast(`Đã đổi phân quyền sang: ${role}`, 'info');
   };

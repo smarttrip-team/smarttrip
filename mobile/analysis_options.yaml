@@ -14,8 +14,8 @@ analyzer:
     - build/**
     - android/**
     - ios/**
-    - web/**
     - windows/**
+    - web/**
     - macos/**
     - linux/**
 

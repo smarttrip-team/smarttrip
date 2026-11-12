@@ -1,10 +1,9 @@
 package com.smarttrip.booking.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -17,19 +16,20 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class BookingCreateRequest {
 
     private Long customerId;
 
+    @NotNull(message = "tourId is required")
     private Long tourId;
 
+    @NotNull(message = "departureId is required")
     private Long departureId;
 
-    private Long tourDepartureId;
-
+    @NotBlank(message = "tourName is required")
     private String tourName;
 
+    @NotNull(message = "departureDate is required")
     private LocalDate departureDate;
 
     @NotNull(message = "unitPrice is required")
@@ -49,29 +49,4 @@ public class BookingCreateRequest {
     private List<BookingHotelDetailRequest> hotelDetails = new ArrayList<>();
 
     private String idempotencyKey;
-
-    private String contactName;
-    private String contactPhone;
-    private String contactEmail;
-
-    public Long getDepartureId() {
-        return departureId != null ? departureId : tourDepartureId;
-    }
-
-    public void setTourDepartureId(Long tourDepartureId) {
-        this.tourDepartureId = tourDepartureId;
-        if (this.departureId == null) {
-            this.departureId = tourDepartureId;
-        }
-    }
-
-    @JsonProperty("hotelReservation")
-    public void setHotelReservation(BookingHotelDetailRequest hr) {
-        if (hr != null) {
-            if (this.hotelDetails == null) {
-                this.hotelDetails = new ArrayList<>();
-            }
-            this.hotelDetails.add(hr);
-        }
-    }
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
+import '../../providers/auth_provider.dart';
+import '../../widgets/role_switcher_bottom_sheet.dart';
 import '../../widgets/stat_card.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -39,18 +42,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat('#,###', 'vi_VN');
+    final user = context.watch<AuthProvider>().currentUser;
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Quay lại',
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
         title: const Text('Admin System Dashboard'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.swap_horiz_rounded),
+            tooltip: 'Đổi vai trò',
+            onPressed: () => showRoleSwitcherBottomSheet(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.home_outlined),
+            tooltip: 'Trang chủ Khách hàng',
+            onPressed: () => context.go('/home'),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Làm mới',
             onPressed: _loadStats,
           ),
           IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () => context.push('/profile'),
+            icon: const Icon(Icons.logout),
+            tooltip: 'Đăng xuất',
+            onPressed: () => showLogoutConfirmDialog(context),
           ),
         ],
       ),
@@ -61,6 +88,64 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Role Banner Card
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.purple.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.purple.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.purple, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Vai trò: Quản trị viên (Admin)',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7E22CE)),
+                              ),
+                              Text(
+                                user?.email ?? 'admin@smarttrip.com',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(Icons.swap_horiz, size: 16),
+                          label: const Text('Đổi Role', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () => showRoleSwitcherBottomSheet(context),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   const Text(
                     'Tổng quan toàn hệ thống',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),

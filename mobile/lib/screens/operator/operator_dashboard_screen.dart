@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/tour_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/role_switcher_bottom_sheet.dart';
 import '../../widgets/stat_card.dart';
 
 class OperatorDashboardScreen extends StatefulWidget {
@@ -50,11 +51,33 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> with 
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Quay lại',
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
         title: const Text('Tour Operator Portal'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () => context.push('/profile'),
+            icon: const Icon(Icons.swap_horiz_rounded),
+            tooltip: 'Đổi vai trò',
+            onPressed: () => showRoleSwitcherBottomSheet(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.home_outlined),
+            tooltip: 'Trang chủ Khách hàng',
+            onPressed: () => context.go('/home'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Đăng xuất',
+            onPressed: () => showLogoutConfirmDialog(context),
           ),
         ],
         bottom: TabBar(
@@ -77,6 +100,64 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> with 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Role Banner Card
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.orange.shade200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.flight_takeoff_rounded, color: Colors.orange, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Vai trò: Tour Operator',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFC2410C)),
+                            ),
+                            Text(
+                              user?.email ?? 'operator@smarttrip.com',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.swap_horiz, size: 16),
+                        label: const Text('Đổi Role', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () => showRoleSwitcherBottomSheet(context),
+                      ),
+                    ],
+                  ),
+                ),
+
                 // KPI Cards
                 Row(
                   children: [

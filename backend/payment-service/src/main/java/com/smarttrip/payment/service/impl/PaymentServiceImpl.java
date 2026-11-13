@@ -144,6 +144,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .amount(amount)
                 .referenceType("BOOKING")
                 .referenceId(bookingId)
+                .idempotencyKey("AUTH-" + bookingId + "-" + System.currentTimeMillis())
                 .build();
         walletTransactionRepository.save(tx);
 
@@ -186,6 +187,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .amount(amount)
                 .referenceType("BOOKING")
                 .referenceId(bookingId)
+                .idempotencyKey("CAPTURE-" + bookingId + "-" + System.currentTimeMillis())
                 .build();
         walletTransactionRepository.save(tx);
 
@@ -229,6 +231,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .amount(amount)
                 .referenceType("BOOKING")
                 .referenceId(bookingId)
+                .idempotencyKey("VOID-" + bookingId + "-" + System.currentTimeMillis())
                 .build();
         walletTransactionRepository.save(tx);
 
@@ -260,6 +263,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .amount(amount)
                 .referenceType("BOOKING")
                 .referenceId(bookingId)
+                .idempotencyKey("REFUND-" + bookingId + "-" + System.currentTimeMillis())
                 .build();
         walletTransactionRepository.save(tx);
 
@@ -289,6 +293,15 @@ public class PaymentServiceImpl implements PaymentService {
         Long targetHotelId = (hotelierId != null) ? hotelierId : 3L;   // Default: Khách sạn Mường Thanh (User 3)
         Long platformAdminId = 4L;                                     // Platform Admin Sàn SmartTrip (User 4)
 
+        // Idempotency guard: prevent duplicate payout for the same booking
+        String tourSettleKey = "SETTLE-TOUR-" + bookingCode + "-" + targetOpId;
+        String hotelSettleKey = "SETTLE-HOTEL-" + bookingCode + "-" + targetHotelId;
+        if (walletTransactionRepository.findByIdempotencyKey(tourSettleKey).isPresent()
+                || walletTransactionRepository.findByIdempotencyKey(hotelSettleKey).isPresent()) {
+            log.warn("Booking {} has already been settled. Skipping duplicate execution.", bookingCode);
+            return;
+        }
+
         BigDecimal targetTourAmount = (tourAmount != null && tourAmount.compareTo(BigDecimal.ZERO) > 0)
                 ? tourAmount
                 : BigDecimal.ZERO;
@@ -313,6 +326,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .amount(opPayout)
                     .referenceType("BOOKING")
                     .referenceId(bookingCode)
+                    .idempotencyKey(tourSettleKey)
                     .build();
             walletTransactionRepository.save(opTx);
 
@@ -326,6 +340,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .amount(platformTourFee)
                     .referenceType("BOOKING")
                     .referenceId(bookingCode)
+                    .idempotencyKey("COMMISSION-TOUR-" + bookingCode)
                     .build();
             walletTransactionRepository.save(feeTx);
 
@@ -348,6 +363,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .amount(hotelPayout)
                     .referenceType("BOOKING")
                     .referenceId(bookingCode)
+                    .idempotencyKey(hotelSettleKey)
                     .build();
             walletTransactionRepository.save(hotelTx);
 
@@ -361,6 +377,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .amount(platformHotelFee)
                     .referenceType("BOOKING")
                     .referenceId(bookingCode)
+                    .idempotencyKey("COMMISSION-HOTEL-" + bookingCode)
                     .build();
             walletTransactionRepository.save(feeTx);
 
@@ -401,6 +418,7 @@ public class PaymentServiceImpl implements PaymentService {
                                 .amount(clawback)
                                 .referenceType("BOOKING")
                                 .referenceId(bookingCode)
+                                .idempotencyKey("REVERSAL-" + bookingCode + "-" + w.getUserId() + "-" + System.currentTimeMillis())
                                 .build();
                         walletTransactionRepository.save(revTx);
                         log.info("Reversed {} VND from wallet {} for cancelled booking {}", clawback, w.getUserId(), bookingCode);

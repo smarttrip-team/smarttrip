@@ -702,8 +702,47 @@ export const TourDetailPage = () => {
     return RICH_TOURS_DATA.find((t) => t.id === tourIdNumber) || RICH_TOURS_DATA[0];
   }, [tourIdNumber]);
 
+  // Real-time departures from backend API
+  const [liveDepartures, setLiveDepartures] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    tourApi.getTourById(tourIdNumber)
+      .then((res) => {
+        const live = res?.data?.upcomingDepartures;
+        if (isMounted && Array.isArray(live) && live.length > 0) {
+          setLiveDepartures(live);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch live departures, using rich tour data:", err?.message);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [tourIdNumber]);
+
+  const activeDepartures = useMemo(() => {
+    if (!liveDepartures || liveDepartures.length === 0) return tour.departures || [];
+    return (tour.departures || []).map((dep) => {
+      const live = liveDepartures.find((l) => l.id === dep.id || l.departureDate === dep.departureDate);
+      return live ? { ...dep, ...live } : dep;
+    });
+  }, [tour.departures, liveDepartures]);
+
   // Selected departure (default to first)
   const [selectedDeparture, setSelectedDeparture] = useState(() => tour.departures?.[0] || null);
+
+  // Sync selectedDeparture when activeDepartures updates
+  useEffect(() => {
+    if (activeDepartures && activeDepartures.length > 0) {
+      setSelectedDeparture((prev) => {
+        if (!prev) return activeDepartures[0];
+        const match = activeDepartures.find((d) => d.id === prev.id);
+        return match || activeDepartures[0];
+      });
+    }
+  }, [activeDepartures]);
 
   // Hotel option & Selected room
   const [includeHotel, setIncludeHotel] = useState(true);
@@ -914,7 +953,7 @@ export const TourDetailPage = () => {
               </h2>
               
               <div className="space-y-3">
-                {tour.departures.map((dep) => {
+                {activeDepartures.map((dep) => {
                   const isSelected = selectedDeparture?.id === dep.id;
                   return (
                     <div 

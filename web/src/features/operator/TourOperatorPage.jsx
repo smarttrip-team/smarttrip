@@ -51,6 +51,49 @@ export default function TourOperatorPage() {
   const [showAddDepartureModal, setShowAddDepartureModal] = useState(false);
   const [selectedTourForDeparture, setSelectedTourForDeparture] = useState(null);
 
+  // Edit Tour & Cover Image State
+  const [showEditTourModal, setShowEditTourModal] = useState(false);
+  const [editingTour, setEditingTour] = useState(null);
+  const [editTourForm, setEditTourForm] = useState({
+    title: '',
+    description: '',
+    durationDays: 3,
+    basePrice: 3500000,
+    coverImageUrl: '',
+  });
+
+  const openEditTour = (tour) => {
+    setEditingTour(tour);
+    setEditTourForm({
+      title: tour.title || tour.name || '',
+      description: tour.description || '',
+      durationDays: tour.durationDays || 3,
+      basePrice: tour.basePrice || 3500000,
+      coverImageUrl: tour.coverImageUrl || tour.imageUrl || '',
+    });
+    setShowEditTourModal(true);
+  };
+
+  const handleUpdateTour = async (e) => {
+    e.preventDefault();
+    if (!editingTour) return;
+    try {
+      await operatorApi.updateTour(editingTour.id, {
+        title: editTourForm.title,
+        description: editTourForm.description,
+        durationDays: Number(editTourForm.durationDays),
+        basePrice: Number(editTourForm.basePrice),
+        coverImageUrl: editTourForm.coverImageUrl,
+      });
+      showToast(`Cập nhật ảnh và thông tin Tour #${editingTour.id} thành công!`, 'success');
+      setShowEditTourModal(false);
+      setEditingTour(null);
+      fetchTours();
+    } catch (err) {
+      showToast(err.message || 'Không thể cập nhật tour', 'error');
+    }
+  };
+
   // Inline Settlement Ledger View
   const [showSettlementLedger, setShowSettlementLedger] = useState(false);
   const [settlementTransactions, setSettlementTransactions] = useState([]);

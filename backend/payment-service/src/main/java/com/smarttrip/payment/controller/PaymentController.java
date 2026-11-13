@@ -4,6 +4,7 @@ import com.smarttrip.payment.dto.PaymentResponse;
 import com.smarttrip.payment.dto.TopUpRequest;
 import com.smarttrip.payment.dto.TransactionResponse;
 import com.smarttrip.payment.dto.WalletResponse;
+import com.smarttrip.payment.dto.WithdrawRequest;
 import com.smarttrip.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,17 @@ public class PaymentController {
         }
         WalletResponse response = paymentService.topUp(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping({"/api/v1/wallet/withdraw", "/api/v1/wallets/withdraw"})
+    public ResponseEntity<WalletResponse> withdraw(
+            @Valid @RequestBody WithdrawRequest request,
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId) {
+        if (request.getUserId() == null && headerUserId != null) {
+            request.setUserId(headerUserId);
+        }
+        WalletResponse response = paymentService.withdraw(request);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping({"/api/v1/wallet/transactions", "/api/v1/wallets/transactions"})

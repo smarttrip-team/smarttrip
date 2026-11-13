@@ -4,6 +4,7 @@ import com.smarttrip.payment.dto.PaymentResponse;
 import com.smarttrip.payment.dto.TopUpRequest;
 import com.smarttrip.payment.dto.TransactionResponse;
 import com.smarttrip.payment.dto.WalletResponse;
+import com.smarttrip.payment.dto.WithdrawRequest;
 import com.smarttrip.payment.entity.*;
 import com.smarttrip.payment.exception.BusinessException;
 import com.smarttrip.payment.exception.ResourceNotFoundException;
@@ -79,6 +80,61 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("Top-up successful for user {}: +{} VND, new balance: {}",
                 request.getUserId(), request.getAmount(), savedWallet.getBalance());
+
+        return mapWalletToResponse(savedWallet);
+    }
+
+    @Override
+    @Transactional
+    public WalletResponse withdraw(WithdrawRequest request) {
+        if (request.getUserId() == null) {
+            throw new BusinessException("User ID is required");
+        }
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Withdraw amount must be greater than zero");
+        }
+
+        String rawKey = (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank())
+                ? request.getIdempotencyKey().trim()
+                : null;
+
+        // Idempotency check
+        if (rawKey != null) {
+            var existingTx = walletTransactionRepository.findByIdempotencyKey(rawKey);
+            if (existingTx.isPresent()) {
+                log.info("Duplicate withdraw request with key: {}", rawKey);
+                Wallet wallet = existingTx.get().getWallet();
+                return mapWalletToResponse(wallet);
+            }
+        }
+
+        Wallet wallet = getOrCreateWallet(request.getUserId());
+        if (wallet.getBalance().compareTo(request.getAmount()) < 0) {
+            throw new BusinessException("Số dư khả dụng không đủ để thực hiện rút tiền");
+        }
+
+        wallet.setBalance(wallet.getBalance().subtract(request.getAmount()));
+        Wallet savedWallet = walletRepository.save(wallet);
+
+        String bank = (request.getBankName() != null && !request.getBankName().isBlank())
+                ? request.getBankName().trim()
+                : "BANK";
+        String acc = (request.getAccountNumber() != null && !request.getAccountNumber().isBlank())
+                ? request.getAccountNumber().trim()
+                : ("WD-" + System.currentTimeMillis());
+
+        WalletTransaction tx = WalletTransaction.builder()
+                .wallet(savedWallet)
+                .transactionType("WITHDRAW")
+                .amount(request.getAmount())
+                .referenceType(bank)
+                .referenceId(acc)
+                .idempotencyKey(rawKey)
+                .build();
+        walletTransactionRepository.save(tx);
+
+        log.info("Withdraw successful for user {}: -{} VND to {} ({}), new balance: {}",
+                request.getUserId(), request.getAmount(), acc, bank, savedWallet.getBalance());
 
         return mapWalletToResponse(savedWallet);
     }

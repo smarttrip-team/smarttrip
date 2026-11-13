@@ -106,8 +106,8 @@ export const WalletPage = () => {
     }
   };
 
-  // Handle Partner Payout / Withdraw Simulation
-  const handlePayout = (e) => {
+  // Handle Partner Payout / Withdraw
+  const handlePayout = async (e) => {
     e.preventDefault();
     const amount = Number(payoutAmount);
     if (!amount || amount <= 0) {
@@ -120,17 +120,33 @@ export const WalletPage = () => {
     }
 
     setIsPayoutSubmitting(true);
-    setTimeout(() => {
-      setIsPayoutSubmitting(false);
+    try {
+      await walletApi.withdraw({
+        userId: currentUserId,
+        amount: amount,
+        bankName: payoutBank,
+        accountNumber: payoutAccount,
+        beneficiaryName: payoutBeneficiary,
+      });
+      await refreshWallet(currentUserId);
+      await fetchTransactions();
       showToast(
-        `Đã lập lệnh rút ${formatVND(amount)} về tài khoản ${payoutAccount} (${payoutBank}) thành công! Tiền sẽ được ngân hàng xử lý.`,
+        `Đã rút ${formatVND(amount)} về tài khoản ${payoutAccount} (${payoutBank}) thành công! Số dư ví đã được cập nhật.`,
         'success'
       );
-    }, 900);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Lỗi xử lý rút tiền';
+      showToast(`Rút tiền thất bại: ${msg}`, 'error');
+    } finally {
+      setIsPayoutSubmitting(false);
+    }
   };
 
   const getTxBadge = (type) => {
     switch (type) {
+      case 'WITHDRAW':
+      case 'PAYOUT':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800"><ArrowUpRight className="w-3 h-3" /> Rút tiền (WITHDRAW)</span>;
       case 'TOP_UP':
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800"><ArrowDownLeft className="w-3 h-3" /> Nạp tiền (TOP_UP)</span>;
       case 'HOLD':
@@ -583,6 +599,7 @@ export const WalletPage = () => {
                 {transactions.map((tx) => {
                   const isPositive = ['TOP_UP', 'REFUND', 'SETTLEMENT_TOUR', 'SETTLEMENT_HOTEL', 'COMMISSION_REVENUE'].includes(tx.transactionType);
                   const isReversal = tx.transactionType === 'SETTLEMENT_REVERSAL';
+                  const isWithdraw = tx.transactionType === 'WITHDRAW' || tx.transactionType === 'PAYOUT';
                   return (
                     <tr key={tx.id || Math.random()} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-3.5 font-mono text-xs text-slate-500">
@@ -591,7 +608,7 @@ export const WalletPage = () => {
                       <td className="px-6 py-3.5">
                         {getTxBadge(tx.transactionType)}
                       </td>
-                      <td className={`px-6 py-3.5 font-semibold ${isReversal ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'}`}>
+                      <td className={`px-6 py-3.5 font-semibold ${isReversal || isWithdraw ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'}`}>
                         {isPositive ? '+' : '-'}{formatVND(tx.amount)}
                       </td>
                       <td className="px-6 py-3.5">
@@ -607,7 +624,7 @@ export const WalletPage = () => {
                         {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}
                       </td>
                       <td className="px-6 py-3.5 text-xs text-slate-500 max-w-xs truncate">
-                        {tx.description || (isReversal ? 'Thu hồi 90% doanh thu do khách hủy đơn' : isPositive ? 'Thanh toán thành công từ hệ thống' : '—')}
+                        {tx.description || (isReversal ? 'Thu hồi 90% doanh thu do khách hủy đơn' : isWithdraw ? `Rút về ${tx.referenceType || 'TK ngân hàng'}` : isPositive ? 'Thanh toán thành công từ hệ thống' : '—')}
                       </td>
                     </tr>
                   );

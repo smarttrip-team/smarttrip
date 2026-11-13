@@ -80,6 +80,7 @@ export const hotelManagerApi = {
 export const walletApi = {
   getWallet: (userId) => API.get(`/api/v1/wallets/user/${userId}`),
   topUp: (payload) => API.post('/api/v1/wallet/top-ups', payload),
+  withdraw: (payload) => API.post('/api/v1/wallets/withdraw', payload),
   getTransactions: (userId) => API.get(`/api/v1/wallet/transactions?userId=${userId}`),
 };
 

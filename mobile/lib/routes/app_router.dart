@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import '../models/tour_model.dart';
 import '../providers/auth_provider.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
+import '../screens/admin/all_bookings_screen.dart';
 import '../screens/admin/user_management_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -95,6 +96,10 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/admin/users',
         builder: (context, state) => const UserManagementScreen(),
+      ),
+      GoRoute(
+        path: '/admin/bookings',
+        builder: (context, state) => const AllBookingsScreen(),
       ),
     ],
   );

@@ -360,4 +360,94 @@ void main() {
       expect(unblockRows, greaterThan(0));
     });
   });
+
+  group('8. Role Access Isolation & 90/90/10 Revenue Sharing Tests', () {
+    test('Phân quyền xem đơn đặt: Chỉ Operator, Hotelier và Admin xem được danh sách đơn theo phạm vi quản lý', () async {
+      final allUsers = await DatabaseHelper.instance.getAllUsers();
+      final customer = allUsers.firstWhere((u) => u.email == 'customer@smarttrip.com');
+      final operator = allUsers.firstWhere((u) => u.email == 'operator@smarttrip.com');
+      final hotelier = allUsers.firstWhere((u) => u.email == 'hotelier@smarttrip.com');
+
+      final userBookings = await DatabaseHelper.instance.getUserBookings(customer.id!);
+      final operatorBookings = await DatabaseHelper.instance.getBookingsForOperator(operator.id!);
+      final hotelierBookings = await DatabaseHelper.instance.getBookingsForHotelier(hotelier.id!);
+      final adminBookings = await DatabaseHelper.instance.getAllBookingsForAdmin();
+
+      // Kiểm tra user chỉ thấy các đơn của mình
+      for (var b in userBookings) {
+        expect(b.userId, equals(customer.id));
+      }
+
+      // Kiểm tra Operator thấy các đơn của tour mình quản lý
+      expect(operatorBookings, isNotEmpty);
+
+      // Kiểm tra Hotelier thấy các đơn có khách sạn của mình
+      expect(hotelierBookings, isNotEmpty);
+
+      // Kiểm tra Admin thấy toàn bộ đơn trong hệ thống
+      expect(adminBookings.length, greaterThanOrEqualTo(userBookings.length));
+    });
+
+    test('Sau khi xong tour: Phân chia 90% Tour, 90% Hotel và 10% cho Hệ thống SmartTrip', () async {
+      final bookingProvider = BookingProvider();
+      final allUsers = await DatabaseHelper.instance.getAllUsers();
+      final customer = allUsers.firstWhere((u) => u.email == 'customer@smarttrip.com');
+      final operator = allUsers.firstWhere((u) => u.email == 'operator@smarttrip.com');
+      final hotelier = allUsers.firstWhere((u) => u.email == 'hotelier@smarttrip.com');
+      final admin = allUsers.firstWhere((u) => u.email == 'admin@smarttrip.com');
+
+      final tours = await DatabaseHelper.instance.getAllTours();
+      final tour = tours.first;
+      final hotels = await DatabaseHelper.instance.getAllHotels();
+      final hotel = hotels.first;
+
+      const tourPrice = 3000000.0;
+      const hotelPrice = 1000000.0;
+      const totalAmount = tourPrice + hotelPrice; // 4.000.000 đ
+
+      // 1. Khách hàng đặt tour kèm khách sạn
+      final bookingId = await bookingProvider.createBookingAndPay(
+        userId: customer.id!,
+        tourId: tour.id!,
+        hotelId: hotel.id!,
+        departureDate: '2026-12-15',
+        adultCount: 1,
+        childCount: 0,
+        tourAmount: tourPrice,
+        hotelAmount: hotelPrice,
+        totalAmount: totalAmount,
+      );
+      expect(bookingId, isNotNull);
+
+      final opBalanceBefore = await DatabaseHelper.instance.getWalletBalance(operator.id!);
+      final hotelierBalanceBefore = await DatabaseHelper.instance.getWalletBalance(hotelier.id!);
+      final adminBalanceBefore = await DatabaseHelper.instance.getWalletBalance(admin.id!);
+
+      // 2. Xác nhận xong tour (COMPLETED)
+      final completeSuccess = await bookingProvider.completeBooking(bookingId!);
+      expect(completeSuccess, isTrue);
+
+      // 3. Kiểm tra số dư ví được cộng chính xác theo tỷ lệ 90/90/10
+      final opBalanceAfter = await DatabaseHelper.instance.getWalletBalance(operator.id!);
+      final hotelierBalanceAfter = await DatabaseHelper.instance.getWalletBalance(hotelier.id!);
+      final adminBalanceAfter = await DatabaseHelper.instance.getWalletBalance(admin.id!);
+
+      const expectedOpRevenue = tourPrice * 0.90; // 2.700.000 đ
+      const expectedHotelierRevenue = hotelPrice * 0.90; // 900.000 đ
+      const expectedSystemCommission = totalAmount * 0.10; // 400.000 đ
+
+      expect(opBalanceAfter - opBalanceBefore, equals(expectedOpRevenue));
+      expect(hotelierBalanceAfter - hotelierBalanceBefore, equals(expectedHotelierRevenue));
+      expect(adminBalanceAfter - adminBalanceBefore, equals(expectedSystemCommission));
+
+      // Tổng tiền chia đúng 100%
+      expect(expectedOpRevenue + expectedHotelierRevenue + expectedSystemCommission, equals(totalAmount));
+
+      // Kiểm tra trạng thái đơn đặt
+      await bookingProvider.loadUserBookings(customer.id!);
+      final completedBooking = bookingProvider.userBookings.firstWhere((b) => b.id == bookingId);
+      expect(completedBooking.status, equals('COMPLETED'));
+      expect(completedBooking.isCompleted, isTrue);
+    });
+  });
 }

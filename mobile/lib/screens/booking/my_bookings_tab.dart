@@ -164,20 +164,28 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Row(
-                children: [
-                  _buildFilterChip('Tất cả (${allBookings.length})', 'ALL'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'Đã xác nhận (${allBookings.where((b) => b.status == 'CONFIRMED').length})',
-                    'CONFIRMED',
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'Đã hủy (${allBookings.where((b) => b.status == 'CANCELLED').length})',
-                    'CANCELLED',
-                  ),
-                ],
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip('Tất cả (${allBookings.length})', 'ALL'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'Sắp đi (${allBookings.where((b) => b.isConfirmed).length})',
+                      'CONFIRMED',
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'Hoàn thành (${allBookings.where((b) => b.isCompleted).length})',
+                      'COMPLETED',
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'Đã hủy (${allBookings.where((b) => b.isCancelled).length})',
+                      'CANCELLED',
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -196,7 +204,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                         : ListView.separated(
                             padding: const EdgeInsets.all(16),
                             itemCount: filteredBookings.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 16),
+                            separatorBuilder: (context, _) => const SizedBox(height: 16),
                             itemBuilder: (context, index) {
                               final booking = filteredBookings[index];
                               return _buildBookingTicketCard(context, booking, currencyFormat);
@@ -212,29 +220,25 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
 
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _filter == value;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _filter = value),
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: () => setState(() => _filter = value),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected ? Colors.white : const Color(0xFF64748B),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          textAlign: TextAlign.center,
         ),
       ),
     );
@@ -286,7 +290,29 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   }
 
   Widget _buildBookingTicketCard(BuildContext context, BookingModel booking, NumberFormat currencyFormat) {
-    final isConfirmed = booking.status == 'CONFIRMED';
+    final isConfirmed = booking.isConfirmed;
+    final isCompleted = booking.isCompleted;
+    final isCancelled = booking.isCancelled;
+
+    Color badgeBg = Colors.green.shade50;
+    Color badgeBorder = Colors.green.shade300;
+    Color badgeColor = Colors.green.shade700;
+    IconData badgeIcon = Icons.check_circle;
+    String badgeText = 'ĐÃ XÁC NHẬN';
+
+    if (isCompleted) {
+      badgeBg = Colors.teal.shade50;
+      badgeBorder = Colors.teal.shade300;
+      badgeColor = Colors.teal.shade700;
+      badgeIcon = Icons.task_alt;
+      badgeText = 'ĐÃ HOÀN THÀNH';
+    } else if (isCancelled) {
+      badgeBg = Colors.red.shade50;
+      badgeBorder = Colors.red.shade300;
+      badgeColor = Colors.red.shade700;
+      badgeIcon = Icons.cancel;
+      badgeText = 'ĐÃ HỦY & HOÀN TIỀN';
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -322,27 +348,21 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isConfirmed ? Colors.green.shade50 : Colors.red.shade50,
+                    color: badgeBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isConfirmed ? Colors.green.shade300 : Colors.red.shade300,
-                    ),
+                    border: Border.all(color: badgeBorder),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        isConfirmed ? Icons.check_circle : Icons.cancel,
-                        size: 13,
-                        color: isConfirmed ? Colors.green.shade700 : Colors.red.shade700,
-                      ),
+                      Icon(badgeIcon, size: 13, color: badgeColor),
                       const SizedBox(width: 4),
                       Text(
-                        isConfirmed ? 'ĐÃ XÁC NHẬN' : 'ĐÃ HỦY & HOÀN TIỀN',
+                        badgeText,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: isConfirmed ? Colors.green.shade700 : Colors.red.shade700,
+                          color: badgeColor,
                         ),
                       ),
                     ],

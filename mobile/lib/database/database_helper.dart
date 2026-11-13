@@ -27,7 +27,7 @@ class DatabaseHelper {
     _database = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onCreate: _createDB,
       ),
     );
@@ -68,8 +68,16 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          try {
+            await db.execute('ALTER TABLE bookings ADD COLUMN tourAmount REAL NOT NULL DEFAULT 0.0');
+            await db.execute('ALTER TABLE bookings ADD COLUMN hotelAmount REAL NOT NULL DEFAULT 0.0');
+          } catch (_) {}
+        }
+      },
     );
   }
 
@@ -148,6 +156,8 @@ class DatabaseHelper {
         departureDate TEXT NOT NULL,
         adultCount INTEGER NOT NULL,
         childCount INTEGER NOT NULL,
+        tourAmount REAL NOT NULL DEFAULT 0.0,
+        hotelAmount REAL NOT NULL DEFAULT 0.0,
         totalAmount REAL NOT NULL,
         status TEXT NOT NULL DEFAULT 'CONFIRMED',
         createdAt TEXT NOT NULL
@@ -189,7 +199,7 @@ class DatabaseHelper {
       'status': 'active',
     });
 
-    await db.insert('users', {
+    final adminId = await db.insert('users', {
       'fullName': 'System Administrator',
       'email': 'admin@smarttrip.com',
       'password': 'admin123',
@@ -212,9 +222,10 @@ class DatabaseHelper {
       'createdAt': now,
     });
 
-    // Cấp ví cho Operator và Hotelier
+    // Cấp ví cho Operator, Hotelier và Admin
     await db.insert('wallets', {'userId': operatorId, 'balance': 50000000.0});
     await db.insert('wallets', {'userId': hotelierId, 'balance': 30000000.0});
+    await db.insert('wallets', {'userId': adminId, 'balance': 0.0});
 
     // 3. Seed 6 Tour Du Lịch
     final toursData = [
@@ -333,6 +344,63 @@ class DatabaseHelper {
     for (var hotel in hotelsData) {
       await db.insert('hotels', hotel);
     }
+
+    // 4. Seed Đơn đặt tour mẫu & Phân chia Doanh thu (90% Tour, 90% Hotel, 10% Sàn)
+    // Đơn 1: Đã hoàn thành (xong tour) -> Đã ghi nhận doanh thu thực nhận
+    final completedBookingId = await db.insert('bookings', {
+      'userId': customerId,
+      'tourId': 1,
+      'hotelId': 4, // Sheraton Nha Trang Hotel & Spa
+      'departureDate': '01/11/2026',
+      'adultCount': 2,
+      'childCount': 0,
+      'tourAmount': 7780000.0,
+      'hotelAmount': 1450000.0,
+      'totalAmount': 9230000.0,
+      'status': 'COMPLETED',
+      'createdAt': now,
+    });
+
+    // Ghi nhận doanh thu seed cho đơn #1:
+    // Operator: 7.780.000 * 0.9 = 7.002.000 đ
+    await db.insert('wallet_transactions', {
+      'userId': operatorId,
+      'amount': 7002000.0,
+      'type': 'REVENUE',
+      'description': 'Doanh thu 90% tiền tour mã vé #$completedBookingId (Xong tour)',
+      'createdAt': now,
+    });
+    // Hotelier: 1.450.000 * 0.9 = 1.305.000 đ
+    await db.insert('wallet_transactions', {
+      'userId': hotelierId,
+      'amount': 1305000.0,
+      'type': 'REVENUE',
+      'description': 'Doanh thu 90% tiền phòng mã vé #$completedBookingId (Xong tour)',
+      'createdAt': now,
+    });
+    // Admin: 9.230.000 * 0.1 = 923.000 đ
+    await db.insert('wallet_transactions', {
+      'userId': adminId,
+      'amount': 923000.0,
+      'type': 'COMMISSION',
+      'description': '10% phí sàn hệ thống từ mã vé #$completedBookingId (Xong tour)',
+      'createdAt': now,
+    });
+
+    // Đơn 2: Chờ hoàn thành (CONFIRMED) -> Người dùng có thể bấm nút "Xác Nhận Xong Tour" để kích hoạt phân chia tiền
+    await db.insert('bookings', {
+      'userId': customerId,
+      'tourId': 2,
+      'hotelId': 1, // Vinpearl Resort & Spa Phú Quốc
+      'departureDate': '25/11/2026',
+      'adultCount': 1,
+      'childCount': 1,
+      'tourAmount': 9333000.0,
+      'hotelAmount': 2250000.0,
+      'totalAmount': 11583000.0,
+      'status': 'CONFIRMED',
+      'createdAt': now,
+    });
   }
 
   // ==================== USER OPERATIONS ====================
@@ -541,6 +609,8 @@ class DatabaseHelper {
     required String departureDate,
     required int adultCount,
     required int childCount,
+    double? tourAmount,
+    double? hotelAmount,
     required double totalAmount,
   }) async {
     final db = await database;
@@ -570,7 +640,11 @@ class DatabaseHelper {
         'createdAt': DateTime.now().toIso8601String(),
       });
 
-      // 4. Tạo Booking CONFIRMED
+      // 4. Tính toán phần tiền Tour và Khách sạn
+      final hAmt = hotelAmount ?? 0.0;
+      final tAmt = tourAmount ?? (totalAmount - hAmt);
+
+      // 5. Tạo Booking CONFIRMED
       final bookingId = await txn.insert('bookings', {
         'userId': userId,
         'tourId': tourId,
@@ -578,6 +652,8 @@ class DatabaseHelper {
         'departureDate': departureDate,
         'adultCount': adultCount,
         'childCount': childCount,
+        'tourAmount': tAmt,
+        'hotelAmount': hAmt,
         'totalAmount': totalAmount,
         'status': 'CONFIRMED',
         'createdAt': DateTime.now().toIso8601String(),
@@ -598,7 +674,7 @@ class DatabaseHelper {
       );
       if (res.isEmpty) return false;
       final booking = res.first;
-      if (booking['status'] == 'CANCELLED') return false;
+      if (booking['status'] == 'CANCELLED' || booking['status'] == 'COMPLETED') return false;
 
       final refundAmount = (booking['totalAmount'] as num?)?.toDouble() ?? 0.0;
 
@@ -635,13 +711,112 @@ class DatabaseHelper {
     });
   }
 
+  // Phân chia doanh thu sau khi hoàn thành xong tour:
+  // 90% tiền tour cho Operator, 90% tiền phòng cho Hotelier, 10% tổng tiền cho Hệ thống
+  Future<bool> completeBooking(int bookingId) async {
+    final db = await database;
+    return await db.transaction((txn) async {
+      final res = await txn.rawQuery('''
+        SELECT b.*, t.operatorId, h.managerId
+        FROM bookings b
+        LEFT JOIN tours t ON b.tourId = t.id
+        LEFT JOIN hotels h ON b.hotelId = h.id
+        WHERE b.id = ?
+      ''', [bookingId]);
+
+      if (res.isEmpty) return false;
+      final booking = res.first;
+      if (booking['status'] == 'COMPLETED' || booking['status'] == 'CANCELLED') {
+        return false;
+      }
+
+      final total = (booking['totalAmount'] as num?)?.toDouble() ?? 0.0;
+      double tourAmt = (booking['tourAmount'] as num?)?.toDouble() ?? 0.0;
+      double hotelAmt = (booking['hotelAmount'] as num?)?.toDouble() ?? 0.0;
+      if (tourAmt == 0.0 && hotelAmt == 0.0) {
+        tourAmt = total;
+      }
+
+      final opRevenue = tourAmt * 0.90;
+      final hotelRevenue = hotelAmt * 0.90;
+      final sysRevenue = total * 0.10;
+      final now = DateTime.now().toIso8601String();
+
+      // 1. Cập nhật booking status = 'COMPLETED'
+      await txn.update(
+        'bookings',
+        {'status': 'COMPLETED'},
+        where: 'id = ?',
+        whereArgs: [bookingId],
+      );
+
+      // 2. Cộng 90% tiền tour cho Tour Operator
+      final opId = (booking['operatorId'] as int?) ?? 2;
+      final opWallet = await txn.query('wallets', where: 'userId = ?', whereArgs: [opId]);
+      if (opWallet.isNotEmpty) {
+        final curBal = (opWallet.first['balance'] as num?)?.toDouble() ?? 0.0;
+        await txn.update('wallets', {'balance': curBal + opRevenue}, where: 'userId = ?', whereArgs: [opId]);
+      } else {
+        await txn.insert('wallets', {'userId': opId, 'balance': opRevenue});
+      }
+      await txn.insert('wallet_transactions', {
+        'userId': opId,
+        'amount': opRevenue,
+        'type': 'REVENUE',
+        'description': 'Doanh thu 90% tiền tour mã đơn #$bookingId (Hoàn tất chuyến đi)',
+        'createdAt': now,
+      });
+
+      // 3. Cộng 90% tiền phòng cho Hotel Manager (nếu có khách sạn)
+      final hotelierId = booking['managerId'] as int?;
+      if (hotelierId != null && hotelRevenue > 0) {
+        final hWallet = await txn.query('wallets', where: 'userId = ?', whereArgs: [hotelierId]);
+        if (hWallet.isNotEmpty) {
+          final curBal = (hWallet.first['balance'] as num?)?.toDouble() ?? 0.0;
+          await txn.update('wallets', {'balance': curBal + hotelRevenue}, where: 'userId = ?', whereArgs: [hotelierId]);
+        } else {
+          await txn.insert('wallets', {'userId': hotelierId, 'balance': hotelRevenue});
+        }
+        await txn.insert('wallet_transactions', {
+          'userId': hotelierId,
+          'amount': hotelRevenue,
+          'type': 'REVENUE',
+          'description': 'Doanh thu 90% tiền khách sạn mã đơn #$bookingId (Hoàn tất chuyến đi)',
+          'createdAt': now,
+        });
+      }
+
+      // 4. Cộng 10% hoa hồng sàn cho Quản trị viên (Admin)
+      final adminUser = await txn.query('users', where: 'role = ?', whereArgs: ['admin'], limit: 1);
+      final adminId = adminUser.isNotEmpty ? (adminUser.first['id'] as int) : 4;
+      final adminWallet = await txn.query('wallets', where: 'userId = ?', whereArgs: [adminId]);
+      if (adminWallet.isNotEmpty) {
+        final curBal = (adminWallet.first['balance'] as num?)?.toDouble() ?? 0.0;
+        await txn.update('wallets', {'balance': curBal + sysRevenue}, where: 'userId = ?', whereArgs: [adminId]);
+      } else {
+        await txn.insert('wallets', {'userId': adminId, 'balance': sysRevenue});
+      }
+      await txn.insert('wallet_transactions', {
+        'userId': adminId,
+        'amount': sysRevenue,
+        'type': 'COMMISSION',
+        'description': '10% phí hoa hồng sàn từ mã đơn #$bookingId (Hoàn tất chuyến đi)',
+        'createdAt': now,
+      });
+
+      return true;
+    });
+  }
+
   Future<List<BookingModel>> getUserBookings(int userId) async {
     final db = await database;
     final res = await db.rawQuery('''
-      SELECT b.*, t.title as tourTitle, t.imageUrl as tourImage, t.destination, h.name as hotelName
+      SELECT b.*, t.title as tourTitle, t.imageUrl as tourImage, t.destination, h.name as hotelName,
+             u.fullName as customerName, u.phone as customerPhone, u.email as customerEmail
       FROM bookings b
       LEFT JOIN tours t ON b.tourId = t.id
       LEFT JOIN hotels h ON b.hotelId = h.id
+      LEFT JOIN users u ON b.userId = u.id
       WHERE b.userId = ?
       ORDER BY b.id DESC
     ''', [userId]);
@@ -652,15 +827,100 @@ class DatabaseHelper {
   Future<List<BookingModel>> getBookingsForOperator(int operatorId) async {
     final db = await database;
     final res = await db.rawQuery('''
-      SELECT b.*, t.title as tourTitle, t.imageUrl as tourImage, t.destination, h.name as hotelName
+      SELECT b.*, t.title as tourTitle, t.imageUrl as tourImage, t.destination, h.name as hotelName,
+             u.fullName as customerName, u.phone as customerPhone, u.email as customerEmail
       FROM bookings b
       INNER JOIN tours t ON b.tourId = t.id
       LEFT JOIN hotels h ON b.hotelId = h.id
+      LEFT JOIN users u ON b.userId = u.id
       WHERE t.operatorId = ?
       ORDER BY b.id DESC
     ''', [operatorId]);
 
     return res.map((e) => BookingModel.fromMap(e)).toList();
+  }
+
+  Future<List<BookingModel>> getBookingsForHotelier(int managerId) async {
+    final db = await database;
+    final res = await db.rawQuery('''
+      SELECT b.*, t.title as tourTitle, t.imageUrl as tourImage, t.destination, h.name as hotelName,
+             u.fullName as customerName, u.phone as customerPhone, u.email as customerEmail
+      FROM bookings b
+      INNER JOIN hotels h ON b.hotelId = h.id
+      LEFT JOIN tours t ON b.tourId = t.id
+      LEFT JOIN users u ON b.userId = u.id
+      WHERE h.managerId = ?
+      ORDER BY b.id DESC
+    ''', [managerId]);
+
+    return res.map((e) => BookingModel.fromMap(e)).toList();
+  }
+
+  Future<List<BookingModel>> getAllBookingsForAdmin() async {
+    final db = await database;
+    final res = await db.rawQuery('''
+      SELECT b.*, t.title as tourTitle, t.imageUrl as tourImage, t.destination, h.name as hotelName,
+             u.fullName as customerName, u.phone as customerPhone, u.email as customerEmail
+      FROM bookings b
+      LEFT JOIN tours t ON b.tourId = t.id
+      LEFT JOIN hotels h ON b.hotelId = h.id
+      LEFT JOIN users u ON b.userId = u.id
+      ORDER BY b.id DESC
+    ''');
+
+    return res.map((e) => BookingModel.fromMap(e)).toList();
+  }
+
+  Future<Map<String, double>> getOperatorRevenueStats(int operatorId) async {
+    final db = await database;
+    final completedRes = await db.rawQuery('''
+      SELECT SUM(b.tourAmount) as compSum
+      FROM bookings b
+      INNER JOIN tours t ON b.tourId = t.id
+      WHERE t.operatorId = ? AND b.status = 'COMPLETED'
+    ''', [operatorId]);
+
+    final pendingRes = await db.rawQuery('''
+      SELECT SUM(b.tourAmount) as pendSum
+      FROM bookings b
+      INNER JOIN tours t ON b.tourId = t.id
+      WHERE t.operatorId = ? AND b.status = 'CONFIRMED'
+    ''', [operatorId]);
+
+    final compTour = (completedRes.first['compSum'] as num?)?.toDouble() ?? 0.0;
+    final pendTour = (pendingRes.first['pendSum'] as num?)?.toDouble() ?? 0.0;
+
+    return {
+      'completedRevenue': compTour * 0.90,
+      'pendingRevenue': pendTour * 0.90,
+      'commissionFee': compTour * 0.10,
+    };
+  }
+
+  Future<Map<String, double>> getHotelierRevenueStats(int managerId) async {
+    final db = await database;
+    final completedRes = await db.rawQuery('''
+      SELECT SUM(b.hotelAmount) as compSum
+      FROM bookings b
+      INNER JOIN hotels h ON b.hotelId = h.id
+      WHERE h.managerId = ? AND b.status = 'COMPLETED'
+    ''', [managerId]);
+
+    final pendingRes = await db.rawQuery('''
+      SELECT SUM(b.hotelAmount) as pendSum
+      FROM bookings b
+      INNER JOIN hotels h ON b.hotelId = h.id
+      WHERE h.managerId = ? AND b.status = 'CONFIRMED'
+    ''', [managerId]);
+
+    final compHotel = (completedRes.first['compSum'] as num?)?.toDouble() ?? 0.0;
+    final pendHotel = (pendingRes.first['pendSum'] as num?)?.toDouble() ?? 0.0;
+
+    return {
+      'completedRevenue': compHotel * 0.90,
+      'pendingRevenue': pendHotel * 0.90,
+      'commissionFee': compHotel * 0.10,
+    };
   }
 
   // ==================== SYSTEM ADMIN KPI STATS ====================
@@ -670,15 +930,31 @@ class DatabaseHelper {
     final tourCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM tours')) ?? 0;
     final hotelCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM hotels')) ?? 0;
     final bookingCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM bookings')) ?? 0;
-    final totalVolRes = await db.rawQuery("SELECT SUM(amount) as totalVol FROM wallet_transactions WHERE type = 'PAYMENT'");
+    final completedBookingCount = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM bookings WHERE status = 'COMPLETED'")) ?? 0;
+
+    final totalVolRes = await db.rawQuery("SELECT SUM(totalAmount) as totalVol FROM bookings WHERE status = 'COMPLETED'");
     final totalVolume = (totalVolRes.first['totalVol'] as num?)?.toDouble() ?? 0.0;
+
+    final totalTourRes = await db.rawQuery("SELECT SUM(tourAmount) as tourSum FROM bookings WHERE status = 'COMPLETED'");
+    final totalTourSum = (totalTourRes.first['tourSum'] as num?)?.toDouble() ?? 0.0;
+
+    final totalHotelRes = await db.rawQuery("SELECT SUM(hotelAmount) as hotelSum FROM bookings WHERE status = 'COMPLETED'");
+    final totalHotelSum = (totalHotelRes.first['hotelSum'] as num?)?.toDouble() ?? 0.0;
+
+    final systemCommission = totalVolume * 0.10;
+    final operatorPayout = totalTourSum * 0.90;
+    final hotelierPayout = totalHotelSum * 0.90;
 
     return {
       'userCount': userCount,
       'tourCount': tourCount,
       'hotelCount': hotelCount,
       'bookingCount': bookingCount,
+      'completedBookingCount': completedBookingCount,
       'totalVolume': totalVolume,
+      'systemCommission': systemCommission,
+      'operatorPayout': operatorPayout,
+      'hotelierPayout': hotelierPayout,
     };
   }
 }

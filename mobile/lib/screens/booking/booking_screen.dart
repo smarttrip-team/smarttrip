@@ -409,6 +409,8 @@ class _BookingScreenState extends State<BookingScreen> {
                         departureDate: dateFormat.format(_departureDate),
                         adultCount: _adultCount,
                         childCount: _childCount,
+                        tourAmount: tourTotal,
+                        hotelAmount: hotelTotal,
                         totalAmount: grandTotal,
                       );
 
@@ -428,7 +430,9 @@ class _BookingScreenState extends State<BookingScreen> {
                               children: [
                                 Icon(Icons.check_circle, color: Colors.green, size: 28),
                                 SizedBox(width: 8),
-                                Text('Đặt Tour Thành Công!'),
+                                Expanded(
+                                  child: Text('Đặt Tour Thành Công!'),
+                                ),
                               ],
                             ),
                             content: Text(

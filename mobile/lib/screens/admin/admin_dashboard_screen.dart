@@ -199,14 +199,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Doanh thu giao dịch ví
+                  // Doanh thu giao dịch ví & Phân chia 90/90/10
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                        colors: [Color(0xFF581C87), Color(0xFF3B0764)],
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.purple.withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,19 +223,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             Icon(Icons.monetization_on, color: Colors.amber, size: 24),
                             SizedBox(width: 8),
                             Text(
-                              'Tổng dòng tiền thanh toán qua Ví:',
-                              style: TextStyle(color: Colors.white70, fontSize: 14),
+                              'Doanh Thu Phí Sàn SmartTrip (10%):',
+                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${currencyFormat.format(_stats['totalVolume'])} đ',
+                          '${currencyFormat.format(_stats['systemCommission'] ?? 0)} đ',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(color: Colors.white24, height: 1),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Cơ cấu dòng tiền sau khi xong tour (90/90/10):',
+                          style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('✈️ Chi trả Tour Operators (90%):', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            Text('${currencyFormat.format(_stats['operatorPayout'] ?? 0)} đ', style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('🏨 Chi trả Hoteliers (90%):', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            Text('${currencyFormat.format(_stats['hotelierPayout'] ?? 0)} đ', style: const TextStyle(color: Colors.tealAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('💰 Tổng tiền tour đã hoàn thành:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            Text('${currencyFormat.format(_stats['totalVolume'] ?? 0)} đ', style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
                         ),
                       ],
                     ),
@@ -241,6 +279,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 12),
+
+                  Card(
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFF3E8FF),
+                        child: Icon(Icons.receipt_long, color: Colors.purple),
+                      ),
+                      title: const Text('Quản lý Đơn đặt Tour & Doanh thu 90/90/10', style: TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: const Text('Xem tất cả đơn đặt tour của khách, duyệt xong tour & chia tiền'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        context.push('/admin/bookings');
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
                   Card(
                     child: ListTile(
